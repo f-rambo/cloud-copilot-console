@@ -52,48 +52,45 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
+import { useRouter } from 'next/navigation';
 
-const data: Payment[] = [
+const data: Cluster[] = [
   {
-    id: 'm5gr84i9',
-    amount: 316,
-    status: 'success',
-    email: 'ken99@example.com'
-  },
-  {
-    id: '3u1reuv4',
-    amount: 242,
-    status: 'success',
-    email: 'Abe45@example.com'
-  },
-  {
-    id: 'derv1ws0',
-    amount: 837,
-    status: 'processing',
-    email: 'Monserrat44@example.com'
-  },
-  {
-    id: '5kma53ae',
-    amount: 874,
-    status: 'success',
-    email: 'Silas22@example.com'
-  },
-  {
-    id: 'bhqecj4p',
-    amount: 721,
-    status: 'failed',
-    email: 'carmella@example.com'
+    id: '1',
+    name: 'cluster-1',
+    kuberentes_version: '1.25.3',
+    containerd_version: '1.6.4',
+    cilium_version: '1.13.1',
+    api_server_address: '10.0.0.1',
+    domain: 'cluster-1.example.com',
+    status: 'running',
+    provider: 'baremetal',
+    level: 'basic',
+    region: 'us-east-1',
+    node_start_ip: '10.0.0.1',
+    node_end_ip: '10.0.0.10',
+    node_number: 10
   }
 ];
 
-export type Payment = {
+export interface Cluster {
   id: string;
-  amount: number;
-  status: 'pending' | 'processing' | 'success' | 'failed';
-  email: string;
-};
+  name: string;
+  kuberentes_version: string;
+  containerd_version: string;
+  cilium_version: string;
+  api_server_address: string;
+  domain: string;
+  status: 'starting' | 'running' | 'stopping' | 'stopped' | 'deleted';
+  provider: 'baremetal' | 'aws' | 'ali_cloud';
+  level: 'basic' | 'standard' | 'advanced';
+  region: string;
+  node_start_ip: string;
+  node_end_ip: string;
+  node_number: number;
+}
 
-export const columns: ColumnDef<Payment>[] = [
+export const columns: ColumnDef<Cluster>[] = [
   {
     id: 'select',
     header: ({ table }) => (
@@ -115,6 +112,10 @@ export const columns: ColumnDef<Payment>[] = [
     ),
     enableSorting: false,
     enableHiding: false
+  },
+  {
+    accessorKey: 'name',
+    header: 'Name'
   },
   {
     accessorKey: 'status',
@@ -192,6 +193,7 @@ export function ClusterTable() {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+  const router = useRouter();
 
   const table = useReactTable({
     data,
@@ -252,7 +254,11 @@ export function ClusterTable() {
               })}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button variant='outline' size='sm'>
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={() => router.push('cluster/create')}
+        >
           <PlusIcon />
           <span className='hidden lg:inline'>Add Section</span>
         </Button>

@@ -27,14 +27,39 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 
-const profileFormSchema = z.object({
-  username: z
+interface ClusterFormProps {
+  id: string;
+  name: string;
+  provider: 'baremetal' | 'aws' | 'ali_cloud';
+  public_key: string;
+  private_key: string;
+  access_id: string;
+  access_key: string;
+  region: string;
+  node_username: string;
+  node_start_ip: string;
+  node_end_ip: string;
+}
+
+interface ClusterRegionProps {
+  access_id: string;
+  access_key: string;
+  provider: 'baremetal' | 'aws' | 'ali_cloud';
+}
+
+interface ClusterRegion {
+  id: string;
+  name: string;
+}
+
+const clusterFormSchema = z.object({
+  clustername: z
     .string()
     .min(2, {
-      message: 'Username must be at least 2 characters.'
+      message: 'Cluster name must be at least 2 characters.'
     })
     .max(30, {
-      message: 'Username must not be longer than 30 characters.'
+      message: 'Cluster name must not be longer than 30 characters.'
     }),
   email: z
     .string({
@@ -51,7 +76,7 @@ const profileFormSchema = z.object({
     .optional()
 });
 
-type ProfileFormValues = z.infer<typeof profileFormSchema>;
+type ProfileFormValues = z.infer<typeof clusterFormSchema>;
 
 // This can come from your database or API.
 const defaultValues: Partial<ProfileFormValues> = {
@@ -64,7 +89,7 @@ const defaultValues: Partial<ProfileFormValues> = {
 
 export function ClusterForm() {
   const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
+    resolver: zodResolver(clusterFormSchema),
     defaultValues,
     mode: 'onChange'
   });
@@ -89,10 +114,10 @@ export function ClusterForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-8'>
         <FormField
           control={form.control}
-          name='username'
+          name='clustername'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Username</FormLabel>
+              <FormLabel>Cluster Name</FormLabel>
               <FormControl>
                 <Input placeholder='shadcn' {...field} />
               </FormControl>
