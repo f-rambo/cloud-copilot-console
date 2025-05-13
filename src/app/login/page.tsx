@@ -2,6 +2,7 @@ import { LoginForm } from '@/components/login-form';
 import { ThreeDMarquee } from '@/components/3d-marquee';
 
 export default function LoginPage() {
+  // replace with owner systems images
   const images = [
     'https://assets.aceternity.com/cloudinary_bkp/3d-card.png',
     'https://assets.aceternity.com/animated-modal.png',

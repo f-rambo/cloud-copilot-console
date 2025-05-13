@@ -87,7 +87,7 @@ export function WorkflowComponent({
   return (
     <div
       ref={containerRef}
-      className='relative sticky top-80 h-[800px] w-full overflow-hidden p-4'
+      className='sticky top-80 h-[800px] w-full overflow-hidden p-4'
     >
       <div className='absolute inset-0 grid grid-cols-[repeat(40,1fr)] grid-rows-[repeat(40,1fr)] opacity-10'>
         {Array.from({ length: 1600 }).map((_, i) => (
