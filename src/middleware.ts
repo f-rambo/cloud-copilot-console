@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const publicRoutes = ['/login'];
+const publicRoutes = ['/login', '/api/chat'];
 
 export function middleware(request: NextRequest) {
   const userCookie = request.cookies.get('user');
