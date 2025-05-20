@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Send, Bot, Plus, History, User } from 'lucide-react';
+import { Send, Bot, Plus, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,10 +31,8 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 // - tool : AI助手的内部消息，用于指示AI助手调用工具
 const Systemrole = 'system';
 const Userrole = 'user';
-const Assistantrole = 'assistant';
+// const Assistantrole = 'assistant';
 const Agentrole = 'agent';
-const Functionrole = 'function';
-const Toolrole = 'tool';
 
 export function CardsChat() {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
