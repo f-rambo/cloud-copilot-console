@@ -3,12 +3,11 @@ import {
   ChatPromptTemplate,
   MessagesPlaceholder
 } from '@langchain/core/prompts';
-import { BaseMessage } from '@langchain/core/messages';
+import { BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { llm } from '@/lib/langchain/llm';
 import { z } from 'zod';
 import { RunnableConfig } from '@langchain/core/runnables';
-import { HumanMessage } from '@langchain/core/messages';
-import { AgentMembers, Supervisor } from '@/lib/types/agents';
+import { AgentMembers } from '@/lib/types/agents';
 
 export const members = AgentMembers.map((x) => x.name);
 const options = [END, ...members];
@@ -72,23 +71,22 @@ const supervisorChain = formattedPrompt
   )
   .pipe((x) => {
     const toolCall = x.tool_calls?.[0];
-    const nextRole = toolCall ? toolCall.args.next : END;
-    return members.includes(nextRole)
-      ? (toolCall?.args ?? { next: END })
-      : { next: END };
+    const next = toolCall ? toolCall.args.next : END;
+    const message = toolCall ? toolCall.args.message : '';
+    return {
+      next,
+      messages: [
+        new HumanMessage({
+          content: message,
+          name: 'Supervisor'
+        })
+      ]
+    };
   });
+
 export const supervisorNode = async (
   state: typeof AgentState.State,
   config?: RunnableConfig
 ) => {
-  const result = await supervisorChain.invoke(state, config);
-  if (result.next === END) {
-    return {
-      messages: [
-        new HumanMessage({ content: result.message, name: Supervisor })
-      ],
-      next: END
-    };
-  }
-  return { next: result.next, messages: [] };
+  return await supervisorChain.invoke(state, config);
 };

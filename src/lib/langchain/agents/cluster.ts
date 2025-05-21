@@ -32,7 +32,7 @@ export const clusterNode = async (
   const lastMessage = result.messages[result.messages.length - 1];
   return {
     messages: [
-      new HumanMessage({ content: lastMessage.content, name: ClusterAgent }) // 修正拼写错误
+      new HumanMessage({ content: lastMessage.content, name: ClusterAgent })
     ]
   };
 };
