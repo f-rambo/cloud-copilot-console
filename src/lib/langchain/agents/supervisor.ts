@@ -1,75 +1,63 @@
-import { END, Annotation } from '@langchain/langgraph';
+import { END } from '@langchain/langgraph';
 import {
   ChatPromptTemplate,
   MessagesPlaceholder
 } from '@langchain/core/prompts';
-import { BaseMessage, HumanMessage } from '@langchain/core/messages';
-import { llm } from '@/lib/langchain/llm';
-import { z } from 'zod';
-import { RunnableConfig } from '@langchain/core/runnables';
-import { AgentMembers } from '@/lib/types/agents';
+import { AIMessageChunk, HumanMessage } from '@langchain/core/messages';
+import { LangChainService } from '@/lib/langchain/service';
+import { RunnableConfig, Runnable } from '@langchain/core/runnables';
+import { options, getClusterMembersSummary } from '@/lib/types/agents';
+import { AgentState } from '@/lib/types/agents';
+import { routeTool } from '@/lib/langchain/tools/supervisor';
 
-export const members = AgentMembers.map((x) => x.name);
-const options = [END, ...members];
+export class SupervisorAgent {
+  private llmService: LangChainService;
+  private supervisorChain?: Runnable;
 
-const getClusterMembersSummary = (): string[] => {
-  return AgentMembers.map(
-    (member) => `${member.name}: (${member.description})`
-  );
-};
+  constructor(llmService: LangChainService) {
+    this.llmService = llmService;
 
-// This defines the object that is passed between each node
-// in the graph. We will create different nodes for each agent and tool
-export const AgentState = Annotation.Root({
-  messages: Annotation<BaseMessage[]>({
-    reducer: (x, y) => x.concat(y),
-    default: () => []
-  }),
-  // The agent node that last performed work
-  next: Annotation<string>({
-    reducer: (x, y) => y ?? x ?? END,
-    default: () => END
-  })
-});
+    this.initialize();
+  }
 
-// supervisor prompt
-const systemPrompt =
-  'You are a supervisor tasked with managing a conversation between the' +
-  ' following workers: {members}. Given the following user request,' +
-  ' respond with the worker to act next. Each worker will perform a' +
-  ' task and respond with their results and status. When finished,' +
-  ' If no suitable worker is found, then answer this question based on your understanding.' +
-  ' respond with FINISH.';
+  private async initialize() {
+    const systemPrompt =
+      'You are a supervisor tasked with managing a conversation between the' +
+      ' following workers: {members}. Given the following user request,' +
+      ' respond with the worker to act next. Each worker will perform a' +
+      ' task and respond with their results and status. When finished,' +
+      ' If no suitable worker is found, then answer this question based on your understanding.' +
+      ' respond with FINISH.';
 
-const prompt = ChatPromptTemplate.fromMessages([
-  ['system', systemPrompt],
-  new MessagesPlaceholder('messages'),
-  [
-    'human',
-    'Given the conversation above, who should act next?' +
-      ' Or should we FINISH? Select one of: {options}'
-  ]
-]);
+    const prompt = ChatPromptTemplate.fromMessages([
+      ['system', systemPrompt],
+      new MessagesPlaceholder('messages'),
+      [
+        'human',
+        'Given the conversation above, who should act next?' +
+          ' Or should we FINISH? Select one of: {options}'
+      ]
+    ]);
+    const formattedPrompt = await prompt.partial({
+      options: options.join(', '),
+      members: getClusterMembersSummary().join(', ')
+    });
 
-const formattedPrompt = await prompt.partial({
-  options: options.join(', '),
-  members: getClusterMembersSummary().join(', ')
-});
+    const chain = this.llmService
+      .getLLM()
+      .bindTools([routeTool], { tool_choice: 'route' });
+    this.supervisorChain = formattedPrompt.pipe(chain);
+  }
 
-const supervisorChain = formattedPrompt
-  .pipe(
-    llm.bindTools([
-      {
-        name: 'route',
-        description: 'Select the next role and supervisor reply message',
-        schema: z.object({
-          next: z.enum([END, ...members]).describe('The next role to act'),
-          message: z.string().describe('This is the reply from the supervisor.')
-        })
-      }
-    ])
-  )
-  .pipe((x) => {
+  public superviseNode = async (
+    state: typeof AgentState.State,
+    config?: RunnableConfig
+  ) => {
+    if (!this.supervisorChain) {
+      throw new Error('Supervisor chain is not initialized');
+    }
+    const res = await this.supervisorChain.invoke(state, config);
+    const x = res as AIMessageChunk;
     const toolCall = x.tool_calls?.[0];
     const next = toolCall ? toolCall.args.next : END;
     const message = toolCall ? toolCall.args.message : '';
@@ -82,11 +70,5 @@ const supervisorChain = formattedPrompt
         })
       ]
     };
-  });
-
-export const supervisorNode = async (
-  state: typeof AgentState.State,
-  config?: RunnableConfig
-) => {
-  return await supervisorChain.invoke(state, config);
-};
+  };
+}

@@ -1,21 +1,42 @@
 import { START, StateGraph } from '@langchain/langgraph';
-import { AgentState } from '@/lib/langchain/agents/supervisor';
-import { clusterNode } from '@/lib/langchain/agents/cluster';
-import { serviceNode } from '@/lib/langchain/agents/service';
-import { supervisorNode } from '@/lib/langchain/agents/supervisor';
-import { MemorySaver } from '@langchain/langgraph';
-import { ClusterAgent, ServiceAgent, Supervisor } from '@/lib/types/agents';
+import { InMemoryStore } from '@langchain/langgraph';
+import { AgentState } from '@/lib/types/agents';
+import { ClusterAgent } from '@/lib/langchain/agents/cluster';
+import { ServiceAgent } from '@/lib/langchain/agents/service';
+import { SupervisorAgent } from '@/lib/langchain/agents/supervisor';
+import { LangChainService } from '@/lib/langchain/service';
+import { Cluster, Service, Supervisor } from '@/lib/types/agents';
+import { getCheckpointer } from '@/lib/langchain/checkpoint';
 
-// 1. Create the graph
-export const graph = new StateGraph(AgentState)
-  // 2. Add the nodes; these will do the work
-  .addNode(ClusterAgent, clusterNode)
-  .addNode(ServiceAgent, serviceNode)
-  .addNode(Supervisor, supervisorNode)
-  // 3. Define the edges. We will define both regular and conditional ones
-  // After a worker completes, report to supervisor
-  .addEdge(ClusterAgent, Supervisor)
-  .addEdge(ServiceAgent, Supervisor)
-  .addConditionalEdges(Supervisor, (x: typeof AgentState.State) => x.next)
-  .addEdge(START, Supervisor)
-  .compile({ checkpointer: new MemorySaver() });
+export class LangchainStateGraph {
+  private clusterAgent!: ClusterAgent;
+  private serviceAgent!: ServiceAgent;
+  private supervisorAgent!: SupervisorAgent;
+
+  constructor() {
+    this.initialize();
+  }
+
+  private initialize() {
+    const llmService = new LangChainService();
+    this.clusterAgent = new ClusterAgent(llmService);
+    this.serviceAgent = new ServiceAgent(llmService);
+    this.supervisorAgent = new SupervisorAgent(llmService);
+  }
+
+  public async App() {
+    const workflow = new StateGraph(AgentState)
+      .addNode(Cluster, this.clusterAgent.clusterNode)
+      .addNode(Service, this.serviceAgent.serviceNode)
+      .addNode(Supervisor, this.supervisorAgent.superviseNode)
+      .addEdge(Cluster, Supervisor)
+      .addEdge(Service, Supervisor)
+      .addConditionalEdges(Supervisor, (x: typeof AgentState.State) => x.next)
+      .addEdge(START, Supervisor);
+    const graph = workflow.compile({
+      checkpointer: await getCheckpointer(),
+      store: new InMemoryStore()
+    });
+    return graph;
+  }
+}

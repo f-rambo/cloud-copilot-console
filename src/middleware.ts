@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const publicRoutes = ['/login', '/api/chat'];
+const publicRoutes = ['/login'];
 
 export function middleware(request: NextRequest) {
   const userCookie = request.cookies.get('user');
   const { pathname } = request.nextUrl;
+
+  if (pathname.includes('/api')) {
+    return NextResponse.next();
+  }
 
   if (!userCookie && !publicRoutes.includes(pathname)) {
     return NextResponse.redirect(new URL('/login', request.url));

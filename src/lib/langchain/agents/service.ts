@@ -1,28 +1,39 @@
-import { RunnableConfig } from '@langchain/core/runnables';
-import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { RunnableConfig, Runnable } from '@langchain/core/runnables';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
-import { AgentState } from '@/lib/langchain/agents/supervisor';
+import { AgentState } from '@/lib/types/agents';
 import { serviceListTool } from '@/lib/langchain/tools/service';
-import { llm } from '@/lib/langchain/llm';
-import { ServiceAgent } from '@/lib/types/agents';
+import { LangChainService } from '@/lib/langchain/service';
+import { Service } from '@/lib/types/agents';
+import { createReactAgent } from '@langchain/langgraph/prebuilt';
 
-export const serviceAgent = createReactAgent({
-  llm,
-  tools: [serviceListTool],
-  stateModifier: new SystemMessage(
-    'You are a service administrator. You can use service tools to view and manage the service.'
-  )
-});
+export class ServiceAgent {
+  private llmService: LangChainService;
+  private serviceAgent!: Runnable;
+  constructor(llmService: LangChainService) {
+    this.llmService = llmService;
+    this.initialize();
+  }
 
-export const serviceNode = async (
-  state: typeof AgentState.State,
-  config?: RunnableConfig
-) => {
-  const result = await serviceAgent.invoke(state, config);
-  const lastMessage = result.messages[result.messages.length - 1];
-  return {
-    messages: [
-      new HumanMessage({ content: lastMessage.content, name: ServiceAgent })
-    ]
+  private async initialize() {
+    this.serviceAgent = createReactAgent({
+      llm: this.llmService.getLLM(),
+      tools: [serviceListTool],
+      prompt: new SystemMessage(
+        'You are a service administrator. You can use service tools to view and manage the service.'
+      )
+    });
+  }
+
+  public serviceNode = async (
+    state: typeof AgentState.State,
+    config?: RunnableConfig
+  ) => {
+    const result = await this.serviceAgent.invoke(state, config);
+    const lastMessage = result.messages[result.messages.length - 1];
+    return {
+      messages: [
+        new HumanMessage({ content: lastMessage.content, name: Service })
+      ]
+    };
   };
-};
+}
