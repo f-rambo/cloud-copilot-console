@@ -20,21 +20,19 @@ import {
 import { Send, Bot, Plus, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Markdown } from '@/components/ui/markdown';
-
-const Userrole = 'user';
-// const Assistantrole = 'assistant';
-const Agentrole = 'agent';
+import { role } from '@/lib/types/agents';
+import { FormattedMessage } from '@/lib/types/chat';
 
 export function CardsChat() {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const [messages, setMessages] = React.useState([
     {
-      role: Agentrole,
+      role: role.Ai,
       content: 'Hi, how can I help you today?',
       thinking: ''
     }
-  ]);
+  ] as FormattedMessage[]);
   const [input, setInput] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const [isTyping, setIsTyping] = React.useState(false);
@@ -46,26 +44,29 @@ export function CardsChat() {
     if (inputLength === 0) return;
 
     const userMessage = {
-      role: Userrole,
+      role: role.Human,
       content: input,
       thinking: ''
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage as FormattedMessage]);
     setInput('');
     setIsLoading(true);
     setIsTyping(true);
     setCurrentThinking('');
 
     const assistantMessageIndex = messages.length + 1;
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: Agentrole,
-        content: '',
-        thinking: ''
-      }
-    ]);
+    setMessages(
+      (prev) =>
+        [
+          ...prev,
+          {
+            role: role.Ai,
+            content: '',
+            thinking: ''
+          }
+        ] as FormattedMessage[]
+    );
 
     try {
       const chatUrl = process.env.NEXT_PUBLIC_API_SSE_URL + '/msg';
@@ -76,8 +77,8 @@ export function CardsChat() {
         },
         body: JSON.stringify({
           message: input,
-          sessionId: '',
-          userId: ''
+          sessionId: '123456',
+          userId: '1'
         })
       });
 
@@ -192,7 +193,7 @@ export function CardsChat() {
         const newMessages = [...prev];
         if (newMessages[assistantMessageIndex]) {
           newMessages[assistantMessageIndex] = {
-            role: Agentrole,
+            role: role.Ai,
             content: 'Sorry, something went wrong. Please try again.',
             thinking: ''
           };
@@ -252,23 +253,24 @@ export function CardsChat() {
                 <div
                   className={cn(
                     'flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm',
-                    message.role === Userrole
+                    message.role === role.Human
                       ? 'bg-primary text-primary-foreground ml-auto'
                       : 'bg-muted'
                   )}
                 >
-                  {message.role === Userrole ? (
+                  {message.role === role.Human ? (
                     <div className='whitespace-pre-wrap'>{message.content}</div>
                   ) : (
                     <Markdown>{message.content}</Markdown>
                   )}
                 </div>
-                {message.role === Userrole && messages[index + 1]?.thinking && (
-                  <div className='bg-muted/50 max-h-[150px] overflow-y-auto rounded-lg p-3 text-sm italic'>
-                    Thinking:{' '}
-                    <Markdown>{messages[index + 1].thinking}</Markdown>
-                  </div>
-                )}
+                {message.role === role.Human &&
+                  messages[index + 1]?.thinking && (
+                    <div className='bg-muted/50 max-h-[150px] overflow-y-auto rounded-lg p-3 text-sm italic'>
+                      Thinking:{' '}
+                      <Markdown>{messages[index + 1].thinking}</Markdown>
+                    </div>
+                  )}
               </React.Fragment>
             ))}
             {currentThinking && (

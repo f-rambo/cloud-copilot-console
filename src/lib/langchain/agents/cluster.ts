@@ -1,5 +1,5 @@
 import { RunnableConfig, Runnable } from '@langchain/core/runnables';
-import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { SystemMessage, AIMessage } from '@langchain/core/messages';
 import { AgentState } from '@/lib/types/agents';
 import { McpToolClient } from '@/lib/langchain/tools/cluster';
 import { LangChainService } from '@/lib/langchain/service';
@@ -39,9 +39,7 @@ export class ClusterAgent {
     const result = await this.clusterAgent.invoke(state, config);
     const lastMessage = result.messages[result.messages.length - 1];
     return {
-      messages: [
-        new HumanMessage({ content: lastMessage.content, name: Cluster })
-      ]
+      messages: [new AIMessage({ content: lastMessage.content, name: Cluster })]
     };
   };
 }

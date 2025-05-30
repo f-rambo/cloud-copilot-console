@@ -1,5 +1,12 @@
 import { END, Annotation } from '@langchain/langgraph';
 import { BaseMessage } from '@langchain/core/messages';
+import { MessageRoles } from '@/lib/types/chat';
+
+export const role: MessageRoles = {
+  Human: 'Human',
+  Ai: 'Ai',
+  System: 'System'
+};
 
 export interface AgentMember {
   name: string;

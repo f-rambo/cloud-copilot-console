@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { LangchainStateGraph } from '@/lib/langchain/graph';
 import { HumanMessage, AIMessageChunk } from '@langchain/core/messages';
 import { v4 as uuidv4 } from 'uuid';
+import { getCheckpointer } from '@/lib/langchain/checkpoint';
+import {
+  ChatMessage,
+  FormattedMessage,
+  MessagesResponse
+} from '@/lib/types/chat';
+import { role } from '@/lib/types/agents';
 
 const chatIndexString = 'chat/v1/';
 
@@ -40,7 +47,156 @@ export async function POST(request: Request) {
   }
 }
 
-// 模拟SSE服务端回复消息
+async function handlePostMsg(request: Request) {
+  const { message, sessionId, userId } = await request.json();
+  if (!message || !sessionId || !userId) {
+    return NextResponse.json(
+      { msg: 'Missing message/sessionId/userId' },
+      { status: 400 }
+    );
+  }
+
+  const checkpointer = await getCheckpointer();
+  const streamEventsResults = (
+    await new LangchainStateGraph(sessionId, checkpointer).App()
+  ).streamEvents(
+    {
+      messages: [new HumanMessage({ id: uuidv4(), content: message })]
+    },
+    {
+      version: 'v2',
+      configurable: { thread_id: sessionId, user_id: userId },
+      recursionLimit: 100
+    }
+  );
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const event of streamEventsResults) {
+          if (event.event === 'on_chat_model_stream' && event.data.chunk) {
+            const aiMsgChunk = event.data.chunk as AIMessageChunk;
+
+            const chunk = {
+              content: aiMsgChunk.content,
+              type: 'content',
+              sessionId,
+              userId
+            };
+
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`)
+            );
+          }
+        }
+
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+      } catch (error) {
+        console.error('Stream error:', error);
+        const errorMessage = {
+          content: 'Sorry, something went wrong.',
+          type: 'error'
+        };
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
+        );
+      } finally {
+        controller.close();
+      }
+    }
+  });
+
+  return new NextResponse(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+      'Content-Encoding': 'none'
+    }
+  });
+}
+
+async function handleGetMsg(
+  request: Request
+): Promise<NextResponse<MessagesResponse>> {
+  const { searchParams } = new URL(request.url);
+  const sessionId = searchParams.get('sessionId');
+  const userId = searchParams.get('userId');
+
+  if (!sessionId || !userId) {
+    return NextResponse.json<MessagesResponse>(
+      { messages: [], total: 0, error: 'Missing sessionId or userId' },
+      { status: 400 }
+    );
+  }
+
+  const checkpointer = await getCheckpointer();
+  const res = await checkpointer.get({
+    configurable: { thread_id: sessionId, user_id: userId },
+    recursionLimit: 100
+  });
+
+  if (!res?.channel_values.messages) {
+    return NextResponse.json<MessagesResponse>(
+      { messages: [], total: 0, error: 'No messages found' },
+      { status: 400 }
+    );
+  }
+
+  const messages = res?.channel_values.messages as ChatMessage[];
+
+  const formattedMessages = messages.map<FormattedMessage>(
+    (message: ChatMessage, index: number): FormattedMessage => {
+      const isHuman =
+        message.constructor.name === 'HumanMessage' ||
+        (message as { _getType?: () => string })._getType?.() === 'human';
+      const isAI =
+        message.constructor.name === 'AIMessage' ||
+        (message as { _getType?: () => string })._getType?.() === 'ai';
+
+      let content =
+        typeof message.content === 'string'
+          ? message.content
+          : JSON.stringify(message.content) || '';
+
+      let thinking = '';
+
+      const thinkingMatch = content.match(
+        /^(.*?)\n\n(?:Thinking:|思考过程:|思考：)\s*([\s\S]*)$/i
+      );
+      if (thinkingMatch) {
+        content = thinkingMatch[1].trim();
+        thinking = thinkingMatch[2].trim();
+      } else {
+        const fullThinkingMatch = content.match(
+          /^(?:Thinking:|思考过程:|思考：)\s*([\s\S]*)$/i
+        );
+        if (fullThinkingMatch) {
+          thinking = fullThinkingMatch[1].trim();
+          content = '';
+        }
+      }
+
+      return {
+        id: message.id || `msg_${index}`,
+        role: isHuman ? role.Human : isAI ? role.Ai : role.System,
+        content,
+        name: message.name || '',
+        thinking
+      };
+    }
+  );
+
+  const response: MessagesResponse = {
+    messages: formattedMessages,
+    total: formattedMessages.length
+  };
+
+  return NextResponse.json(response, { status: 200 });
+}
+
 async function handleMockMsg(request: Request) {
   const { message, sessionId, userId } = await request.json();
   if (!message || !sessionId || !userId) {
@@ -54,7 +210,6 @@ async function handleMockMsg(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // 模拟思考过程
         const thinkingMessage = {
           content: '<think>',
           type: 'thinking_start'
@@ -83,7 +238,6 @@ async function handleMockMsg(request: Request) {
           encoder.encode(`data: ${JSON.stringify(thinkingEnd)}\n\n`)
         );
 
-        // 模拟包含Markdown格式的回复内容
         const markdownResponse = `# 📋 AI助手回复
 
 您好！我收到了您的消息：**"${message}"**
@@ -193,81 +347,4 @@ greetUser('用户');
       'Access-Control-Allow-Headers': 'Content-Type, Authorization'
     }
   });
-}
-
-// 修复原有的handlePostMsg函数
-async function handlePostMsg(request: Request) {
-  const { message, sessionId, userId } = await request.json();
-  if (!message || !sessionId || !userId) {
-    return NextResponse.json(
-      { msg: 'Missing message/sessionId/userId' },
-      { status: 400 }
-    );
-  }
-
-  const streamEventsResults = (
-    await new LangchainStateGraph(sessionId).App()
-  ).streamEvents(
-    {
-      messages: [new HumanMessage({ id: uuidv4(), content: message })]
-    },
-    {
-      version: 'v2',
-      configurable: { thread_id: sessionId, user_id: userId },
-      recursionLimit: 100
-    }
-  );
-
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const event of streamEventsResults) {
-          if (event.event === 'on_chat_model_stream' && event.data.chunk) {
-            const aiMsgChunk = event.data.chunk as AIMessageChunk;
-
-            // 确保发送的是有效的JSON格式
-            const chunk = {
-              content: aiMsgChunk.content,
-              type: 'content',
-              sessionId,
-              userId
-            };
-
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`)
-            );
-          }
-        }
-
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-      } catch (error) {
-        console.error('Stream error:', error);
-        const errorMessage = {
-          content: 'Sorry, something went wrong.',
-          type: 'error'
-        };
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
-        );
-      } finally {
-        controller.close();
-      }
-    }
-  });
-
-  return new NextResponse(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-      'Content-Encoding': 'none'
-    }
-  });
-}
-
-async function handleGetMsg(request: Request) {
-  console.log(request.url);
-  return NextResponse.json({ msg: 'Hello World' }, { status: 200 });
 }

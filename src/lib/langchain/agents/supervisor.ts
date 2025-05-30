@@ -3,12 +3,13 @@ import {
   ChatPromptTemplate,
   MessagesPlaceholder
 } from '@langchain/core/prompts';
-import { AIMessageChunk, HumanMessage } from '@langchain/core/messages';
+import { AIMessageChunk, AIMessage } from '@langchain/core/messages';
 import { LangChainService } from '@/lib/langchain/service';
 import { RunnableConfig, Runnable } from '@langchain/core/runnables';
 import { options, getClusterMembersSummary } from '@/lib/types/agents';
 import { AgentState } from '@/lib/types/agents';
 import { routeTool } from '@/lib/langchain/tools/supervisor';
+import { Supervisor } from '@/lib/types/agents';
 
 export class SupervisorAgent {
   private llmService: LangChainService;
@@ -64,9 +65,9 @@ export class SupervisorAgent {
     return {
       next,
       messages: [
-        new HumanMessage({
+        new AIMessage({
           content: message,
-          name: 'Supervisor'
+          name: Supervisor
         })
       ]
     };

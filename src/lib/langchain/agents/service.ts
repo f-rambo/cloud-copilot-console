@@ -1,5 +1,5 @@
 import { RunnableConfig, Runnable } from '@langchain/core/runnables';
-import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { SystemMessage, AIMessage } from '@langchain/core/messages';
 import { AgentState } from '@/lib/types/agents';
 import { serviceListTool } from '@/lib/langchain/tools/service';
 import { LangChainService } from '@/lib/langchain/service';
@@ -34,9 +34,7 @@ export class ServiceAgent {
     const result = await this.serviceAgent.invoke(state, config);
     const lastMessage = result.messages[result.messages.length - 1];
     return {
-      messages: [
-        new HumanMessage({ content: lastMessage.content, name: Service })
-      ]
+      messages: [new AIMessage({ content: lastMessage.content, name: Service })]
     };
   };
 }

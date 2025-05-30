@@ -6,16 +6,18 @@ import { ServiceAgent } from '@/lib/langchain/agents/service';
 import { SupervisorAgent } from '@/lib/langchain/agents/supervisor';
 import { LangChainService } from '@/lib/langchain/service';
 import { Cluster, Service, Supervisor } from '@/lib/types/agents';
-import { getCheckpointer } from '@/lib/langchain/checkpoint';
+import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 
 export class LangchainStateGraph {
   private clusterAgent!: ClusterAgent;
   private serviceAgent!: ServiceAgent;
   private supervisorAgent!: SupervisorAgent;
   private sessionId: string;
+  private checkpointer: PostgresSaver;
 
-  constructor(sessionId: string) {
+  constructor(sessionId: string, checkpointer: PostgresSaver) {
     this.sessionId = sessionId;
+    this.checkpointer = checkpointer;
     this.initialize();
   }
 
@@ -36,7 +38,7 @@ export class LangchainStateGraph {
       .addConditionalEdges(Supervisor, (x: typeof AgentState.State) => x.next)
       .addEdge(START, Supervisor);
     const graph = workflow.compile({
-      checkpointer: await getCheckpointer(),
+      checkpointer: this.checkpointer,
       store: new InMemoryStore()
     });
     return graph;
