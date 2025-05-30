@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
-const backendUrl = `${process.env.NEXT_PUBLIC_API ?? ''}${
-  process.env.NEXT_PUBLIC_API_VERSION ?? ''
+const serverUrl = `${process.env.SERVER_API_URL ?? ''}${
+  process.env.API_VERSION ?? ''
 }`;
 
 const accessToken = '';
@@ -12,9 +12,9 @@ const userId = '';
 export async function GET(request: Request) {
   const url = new URL(request.url);
 
-  url.pathname = url.pathname.replace(/\/.*\/backend/, '');
+  url.pathname = url.pathname.replace(/\/.*\/server/, '');
 
-  const newUrl = backendUrl + url.pathname;
+  const newUrl = serverUrl + url.pathname;
   const serachParanms = new URLSearchParams(url.searchParams).toString();
   const newHeaders = new Headers(request.headers);
   newHeaders.append('Authorization', provider + ' ' + accessToken);
@@ -42,9 +42,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const url = new URL(request.url);
-  url.pathname = url.pathname.replace(/\/.*\/backend/, '');
+  url.pathname = url.pathname.replace(/\/.*\/server/, '');
 
-  const newUrl = backendUrl + url.pathname;
+  const newUrl = serverUrl + url.pathname;
   const newHeaders = new Headers(request.headers);
   newHeaders.append('Authorization', provider + ' ' + accessToken);
   newHeaders.append('User-Email', email);
@@ -61,9 +61,9 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   const url = new URL(request.url);
-  url.pathname = url.pathname.replace(/\/.*\/backend/, '');
+  url.pathname = url.pathname.replace(/\/.*\/server/, '');
 
-  const newUrl = backendUrl + url.pathname;
+  const newUrl = serverUrl + url.pathname;
   const newHeaders = new Headers(request.headers);
   newHeaders.append('Authorization', provider + ' ' + accessToken);
   newHeaders.append('User-Email', email);
@@ -80,9 +80,9 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   const url = new URL(request.url);
-  url.pathname = url.pathname.replace(/\/.*\/backend/, '');
+  url.pathname = url.pathname.replace(/\/.*\/server/, '');
 
-  const newUrl = backendUrl + url.pathname;
+  const newUrl = serverUrl + url.pathname;
   const newHeaders = new Headers(request.headers);
 
   const serachParanms = new URLSearchParams(url.searchParams).toString();

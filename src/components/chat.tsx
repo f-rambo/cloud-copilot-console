@@ -1,8 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { Send, Bot, Plus, History } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,28 +17,16 @@ import {
   SheetTitle,
   SheetTrigger
 } from '@/components/ui/sheet';
-import { ChatOllama } from '@langchain/ollama';
-import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { Send, Bot, Plus, History } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Markdown } from '@/components/ui/markdown';
 
-// role
-// - system : 系统消息，用于设置AI助手的行为和角色定位
-// - user : 用户的输入消息
-// - assistant : AI助手的回复消息
-// - agent : AI助手的内部消息，用于指示AI助手的行为和状态
-// - function : AI助手的内部消息，用于指示AI助手调用函数
-// - tool : AI助手的内部消息，用于指示AI助手调用工具
-const Systemrole = 'system';
 const Userrole = 'user';
 // const Assistantrole = 'assistant';
 const Agentrole = 'agent';
 
 export function CardsChat() {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
-  const llm = new ChatOllama({
-    model: 'deepseek-r1:7b',
-    temperature: 0,
-    maxRetries: 2
-  });
 
   const [messages, setMessages] = React.useState([
     {
@@ -59,93 +45,164 @@ export function CardsChat() {
     event.preventDefault();
     if (inputLength === 0) return;
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: Userrole,
-        content: input,
-        thinking: ''
-      }
-    ]);
+    const userMessage = {
+      role: Userrole,
+      content: input,
+      thinking: ''
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
     setIsTyping(true);
+    setCurrentThinking('');
+
+    const assistantMessageIndex = messages.length + 1;
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: Agentrole,
+        content: '',
+        thinking: ''
+      }
+    ]);
 
     try {
-      const systemTemplate =
-        'You are a helpful assistant that translates {input_language} to {output_language}.';
-      const prompt = ChatPromptTemplate.fromMessages([
-        [Systemrole, systemTemplate],
-        [Userrole, '{input}']
-      ]);
-      const chain = prompt.pipe(llm);
-
-      const stream = await chain.stream({
-        input_language: 'English',
-        output_language: 'German',
-        input: input
+      const chatUrl = process.env.NEXT_PUBLIC_API_SSE_URL + '/msg';
+      const response = await fetch(chatUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: input,
+          sessionId: '',
+          userId: ''
+        })
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      if (!response.body) {
+        throw new Error('Response body is null');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
       let currentMessage = '';
       let isThinking = false;
       let thinkingContent = '';
+      let buffer = '';
 
-      for await (const chunk of stream) {
-        if (chunk.content) {
-          const content = chunk.content;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
 
-          if (typeof content === 'string' && content.includes('<think>')) {
-            isThinking = true;
-            thinkingContent = '';
-            continue;
-          }
+          if (done) break;
 
-          if (typeof content === 'string' && content.includes('</think>')) {
-            isThinking = false;
-            setCurrentThinking('');
-            if (!currentMessage) {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  role: Agentrole,
-                  content: '',
-                  thinking: thinkingContent.trim()
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const jsonStr = line.slice(6).trim();
+
+                if (!jsonStr || jsonStr === '[DONE]') {
+                  if (jsonStr === '[DONE]') break;
+                  continue;
                 }
-              ]);
-            }
-            continue;
-          }
 
-          if (isThinking) {
-            thinkingContent += content;
-            setCurrentThinking(thinkingContent);
-            continue;
-          }
+                if (!jsonStr.startsWith('{') && !jsonStr.startsWith('[')) {
+                  console.warn('Skipping non-JSON data:', jsonStr);
+                  continue;
+                }
 
-          currentMessage += content;
-          setMessages((prev) => [
-            ...prev.slice(0, -1),
-            {
-              role: Agentrole,
-              content: currentMessage,
-              thinking: thinkingContent.trim()
+                const data = JSON.parse(jsonStr);
+
+                if (data.content) {
+                  const content = data.content;
+
+                  if (
+                    typeof content === 'string' &&
+                    content.includes('<think>')
+                  ) {
+                    isThinking = true;
+                    thinkingContent = '';
+                    continue;
+                  }
+
+                  if (
+                    typeof content === 'string' &&
+                    content.includes('</think>')
+                  ) {
+                    isThinking = false;
+                    setCurrentThinking('');
+                    setMessages((prev) => {
+                      const newMessages = [...prev];
+                      if (newMessages[assistantMessageIndex]) {
+                        newMessages[assistantMessageIndex] = {
+                          ...newMessages[assistantMessageIndex],
+                          thinking: thinkingContent.trim()
+                        };
+                      }
+                      return newMessages;
+                    });
+                    continue;
+                  }
+
+                  if (isThinking) {
+                    thinkingContent += content;
+                    setCurrentThinking(thinkingContent);
+                    continue;
+                  }
+
+                  currentMessage += content;
+                  setMessages((prev) => {
+                    const newMessages = [...prev];
+                    if (newMessages[assistantMessageIndex]) {
+                      newMessages[assistantMessageIndex] = {
+                        ...newMessages[assistantMessageIndex],
+                        content: currentMessage
+                      };
+                    }
+                    return newMessages;
+                  });
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+                console.error('Problematic line:', line);
+                console.error('JSON string:', line.slice(6).trim());
+                continue;
+              }
             }
-          ]);
+          }
         }
+      } finally {
+        reader.releaseLock();
       }
     } catch (error) {
       console.error('Error calling AI:', error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: Agentrole,
-          content: 'sorry, something went wrong',
-          thinking: ''
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        if (newMessages[assistantMessageIndex]) {
+          newMessages[assistantMessageIndex] = {
+            role: Agentrole,
+            content: 'Sorry, something went wrong. Please try again.',
+            thinking: ''
+          };
         }
-      ]);
+        return newMessages;
+      });
     } finally {
       setIsLoading(false);
       setIsTyping(false);
+      setCurrentThinking('');
     }
   };
 
@@ -200,18 +257,23 @@ export function CardsChat() {
                       : 'bg-muted'
                   )}
                 >
-                  {message.content}
+                  {message.role === Userrole ? (
+                    <div className='whitespace-pre-wrap'>{message.content}</div>
+                  ) : (
+                    <Markdown>{message.content}</Markdown>
+                  )}
                 </div>
                 {message.role === Userrole && messages[index + 1]?.thinking && (
                   <div className='bg-muted/50 max-h-[150px] overflow-y-auto rounded-lg p-3 text-sm italic'>
-                    Thinking: {messages[index + 1].thinking}
+                    Thinking:{' '}
+                    <Markdown>{messages[index + 1].thinking}</Markdown>
                   </div>
                 )}
               </React.Fragment>
             ))}
             {currentThinking && (
               <div className='bg-muted/50 max-h-[100px] overflow-y-auto rounded-lg p-3 text-sm italic'>
-                Thinking: {currentThinking}
+                Thinking: <Markdown>{currentThinking}</Markdown>
               </div>
             )}
             {isTyping && (

@@ -12,14 +12,16 @@ export class LangchainStateGraph {
   private clusterAgent!: ClusterAgent;
   private serviceAgent!: ServiceAgent;
   private supervisorAgent!: SupervisorAgent;
+  private sessionId: string;
 
-  constructor() {
+  constructor(sessionId: string) {
+    this.sessionId = sessionId;
     this.initialize();
   }
 
   private initialize() {
     const llmService = new LangChainService();
-    this.clusterAgent = new ClusterAgent(llmService);
+    this.clusterAgent = new ClusterAgent(llmService, this.sessionId);
     this.serviceAgent = new ServiceAgent(llmService);
     this.supervisorAgent = new SupervisorAgent(llmService);
   }

@@ -1,7 +1,7 @@
 import { END } from '@langchain/langgraph';
 import { z } from 'zod';
 import { members } from '@/lib/types/agents';
-import { DynamicStructuredTool } from 'langchain/tools';
+import { DynamicStructuredTool } from '@langchain/core/tools';
 
 export const routeTool = new DynamicStructuredTool({
   name: 'route',
@@ -11,7 +11,6 @@ export const routeTool = new DynamicStructuredTool({
     message: z.string().describe('This is the reply from the supervisor.')
   }),
   func: async ({ next, message }) => {
-    // console.log('Route tool invoked with:', { next, message });
     return {
       next,
       message

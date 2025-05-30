@@ -9,7 +9,7 @@ export class LangChainService {
   private model: string;
 
   constructor(config: LangChainServiceConfig = {}) {
-    this.model = config.model || 'gpt-4o';
+    this.model = config.model || 'gpt-4';
 
     this.initializeLLM();
   }

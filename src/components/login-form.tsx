@@ -33,9 +33,7 @@ export function LoginForm({
     }
   });
 
-  const userApi = `${process.env.NEXT_PUBLIC_API ?? ''}${
-    process.env.NEXT_PUBLIC_API_VERSION ?? ''
-  }/user/`;
+  const userApi = process.env.NEXT_PUBLIC_API_URL + `/user/`;
 
   const onSubmit = async (values: FormValues) => {
     try {

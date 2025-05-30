@@ -19,7 +19,10 @@ export class ServiceAgent {
       llm: this.llmService.getLLM(),
       tools: [serviceListTool],
       prompt: new SystemMessage(
-        'You are a service administrator. You can use service tools to view and manage the service.'
+        'You are a service administrator. You can use service tools to view and manage the service. ' +
+          'When returning data in table format, ' +
+          'please format the output using markdown table syntax with proper headers and alignment. ' +
+          'For example, use | Column1 | Column2 | Column3 | format with --- separators for table headers.'
       )
     });
   }

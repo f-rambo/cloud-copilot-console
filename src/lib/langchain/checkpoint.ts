@@ -14,10 +14,8 @@ export async function getCheckpointer(): Promise<PostgresSaver> {
 
   setupPromise = (async () => {
     const newCheckpointer = PostgresSaver.fromConnString(
-      'postgresql://postgres:123456@localhost:5432/langchain',
-      {
-        schema: 'langchain'
-      }
+      process.env.POSTGRESQL + '/langchain',
+      { schema: 'langchain' }
     );
     await newCheckpointer.setup();
     checkpointerInstance = newCheckpointer;
