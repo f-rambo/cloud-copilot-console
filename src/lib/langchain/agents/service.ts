@@ -3,7 +3,7 @@ import { SystemMessage, AIMessage } from '@langchain/core/messages';
 import { AgentState } from '@/lib/types/agents';
 import { serviceListTool } from '@/lib/langchain/tools/service';
 import { LangChainService } from '@/lib/langchain/service';
-import { Service } from '@/lib/types/agents';
+import { AgentMembers } from '@/lib/types/agents';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 
 export class ServiceAgent {
@@ -34,7 +34,12 @@ export class ServiceAgent {
     const result = await this.serviceAgent.invoke(state, config);
     const lastMessage = result.messages[result.messages.length - 1];
     return {
-      messages: [new AIMessage({ content: lastMessage.content, name: Service })]
+      messages: [
+        new AIMessage({
+          content: lastMessage.content,
+          name: AgentMembers.ServiceAgent.name
+        })
+      ]
     };
   };
 }

@@ -9,7 +9,7 @@ import { RunnableConfig, Runnable } from '@langchain/core/runnables';
 import { options, getClusterMembersSummary } from '@/lib/types/agents';
 import { AgentState } from '@/lib/types/agents';
 import { routeTool } from '@/lib/langchain/tools/supervisor';
-import { Supervisor } from '@/lib/types/agents';
+import { AgentMembers } from '@/lib/types/agents';
 
 export class SupervisorAgent {
   private llmService: LangChainService;
@@ -67,7 +67,7 @@ export class SupervisorAgent {
       messages: [
         new AIMessage({
           content: message,
-          name: Supervisor
+          name: AgentMembers.Supervisor.name
         })
       ]
     };

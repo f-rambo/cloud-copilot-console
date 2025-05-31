@@ -5,7 +5,7 @@ import { ClusterAgent } from '@/lib/langchain/agents/cluster';
 import { ServiceAgent } from '@/lib/langchain/agents/service';
 import { SupervisorAgent } from '@/lib/langchain/agents/supervisor';
 import { LangChainService } from '@/lib/langchain/service';
-import { Cluster, Service, Supervisor } from '@/lib/types/agents';
+import { AgentMembers } from '@/lib/types/agents';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 
 export class LangchainStateGraph {
@@ -30,13 +30,19 @@ export class LangchainStateGraph {
 
   public async App() {
     const workflow = new StateGraph(AgentState)
-      .addNode(Cluster, this.clusterAgent.clusterNode)
-      .addNode(Service, this.serviceAgent.serviceNode)
-      .addNode(Supervisor, this.supervisorAgent.superviseNode)
-      .addEdge(Cluster, Supervisor)
-      .addEdge(Service, Supervisor)
-      .addConditionalEdges(Supervisor, (x: typeof AgentState.State) => x.next)
-      .addEdge(START, Supervisor);
+      .addNode(AgentMembers.ClusterAgent.name, this.clusterAgent.clusterNode)
+      .addNode(AgentMembers.ServiceAgent.name, this.serviceAgent.serviceNode)
+      .addNode(
+        AgentMembers.ServiceAgent.name,
+        this.supervisorAgent.superviseNode
+      )
+      .addEdge(AgentMembers.ClusterAgent.name, AgentMembers.ServiceAgent.name)
+      .addEdge(AgentMembers.ServiceAgent.name, AgentMembers.ServiceAgent.name)
+      .addConditionalEdges(
+        AgentMembers.ServiceAgent.name,
+        (x: typeof AgentState.State) => x.next
+      )
+      .addEdge(START, AgentMembers.ServiceAgent.name);
     const graph = workflow.compile({
       checkpointer: this.checkpointer,
       store: new InMemoryStore()

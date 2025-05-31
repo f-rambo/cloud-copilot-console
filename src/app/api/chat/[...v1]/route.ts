@@ -1,18 +1,25 @@
 import { NextResponse } from 'next/server';
 import { LangchainStateGraph } from '@/lib/langchain/graph';
-import { HumanMessage, AIMessageChunk } from '@langchain/core/messages';
+import {
+  HumanMessage,
+  AIMessage,
+  SystemMessage,
+  AIMessageChunk
+} from '@langchain/core/messages';
 import { v4 as uuidv4 } from 'uuid';
 import { getCheckpointer } from '@/lib/langchain/checkpoint';
-import {
-  ChatMessage,
-  FormattedMessage,
-  MessagesResponse
-} from '@/lib/types/chat';
-import { role } from '@/lib/types/agents';
+import { getChatSessionManager } from '@/lib/langchain/chat-sessions';
+import { FormattedMessage, MessagesResponse } from '@/lib/types/chat';
+import { MessageRoles } from '@/lib/types/chat';
+
+type ChatMessage = HumanMessage | AIMessage | SystemMessage;
 
 const chatIndexString = 'chat/v1/';
 
 const msgFunction = '/msg';
+const mockMsgFunction = '/mock-msg';
+const sessionsFunction = '/sessions';
+const sessionFunction = '/session';
 
 function getRealPathUrl(url: string) {
   const urlObj = new URL(url);
@@ -30,6 +37,8 @@ export async function GET(request: Request) {
   switch (url) {
     case msgFunction:
       return handleGetMsg(request);
+    case sessionsFunction:
+      return handleGetSessions(request);
     default:
       return NextResponse.json({ msg: 'Not found' }, { status: 400 });
   }
@@ -40,10 +49,181 @@ export async function POST(request: Request) {
   switch (url) {
     case msgFunction:
       return handlePostMsg(request);
-    case '/mock-msg':
+    case mockMsgFunction:
       return handleMockMsg(request);
+    case sessionFunction:
+      return handleCreateSession(request);
     default:
       return NextResponse.json({ msg: 'Not found' }, { status: 400 });
+  }
+}
+
+export async function PUT(request: Request) {
+  const url = getRealPathUrl(request.url);
+  switch (url) {
+    case sessionFunction:
+      return handleUpdateSession(request);
+    default:
+      return NextResponse.json({ msg: 'Not found' }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const url = getRealPathUrl(request.url);
+  switch (url) {
+    case sessionFunction:
+      return handleDeleteSession(request);
+    default:
+      return NextResponse.json({ msg: 'Not found' }, { status: 400 });
+  }
+}
+
+// 获取用户的聊天会话列表
+async function handleGetSessions(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Missing userId parameter' },
+        { status: 400 }
+      );
+    }
+
+    const sessionManager = await getChatSessionManager();
+    const sessions = await sessionManager.getUserSessions(
+      userId,
+      includeDeleted
+    );
+
+    return NextResponse.json({
+      sessions,
+      total: sessions.length
+    });
+  } catch (error) {
+    console.error('Error fetching sessions:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch sessions' },
+      { status: 500 }
+    );
+  }
+}
+
+// 创建新的聊天会话
+async function handleCreateSession(request: Request) {
+  try {
+    const { sessionId, userId, title } = await request.json();
+
+    if (!sessionId || !userId) {
+      return NextResponse.json(
+        { error: 'Missing sessionId or userId' },
+        { status: 400 }
+      );
+    }
+
+    const sessionManager = await getChatSessionManager();
+
+    const existingSession = await sessionManager.getSessionById(sessionId);
+    if (existingSession) {
+      return NextResponse.json(
+        { error: 'Session already exists' },
+        { status: 409 }
+      );
+    }
+
+    const session = await sessionManager.createSession(
+      sessionId,
+      userId,
+      title.trim().substring(0, 50)
+    );
+
+    return NextResponse.json({
+      session,
+      message: 'Session created successfully'
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to create session' + error },
+      { status: 500 }
+    );
+  }
+}
+
+// 更新聊天会话（主要是标题）
+async function handleUpdateSession(request: Request) {
+  try {
+    const { sessionId, title } = await request.json();
+
+    if (!sessionId) {
+      return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 });
+    }
+
+    const sessionManager = await getChatSessionManager();
+    const updatedSession = await sessionManager.updateSessionTitle(
+      sessionId,
+      title
+    );
+
+    if (!updatedSession) {
+      return NextResponse.json(
+        { error: 'Session not found or already deleted' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      session: updatedSession,
+      message: 'Session updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating session:', error);
+    return NextResponse.json(
+      { error: 'Failed to update session' },
+      { status: 500 }
+    );
+  }
+}
+
+// 删除聊天会话（软删除）
+async function handleDeleteSession(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get('sessionId');
+    const permanent = searchParams.get('permanent') === 'true';
+
+    if (!sessionId) {
+      return NextResponse.json(
+        { error: 'Missing sessionId parameter' },
+        { status: 400 }
+      );
+    }
+
+    const sessionManager = await getChatSessionManager();
+
+    let success: boolean;
+    if (permanent) {
+      success = await sessionManager.permanentDeleteSession(sessionId);
+    } else {
+      success = await sessionManager.deleteSession(sessionId);
+    }
+
+    if (!success) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      message: permanent
+        ? 'Session permanently deleted'
+        : 'Session deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting session:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete session' },
+      { status: 500 }
+    );
   }
 }
 
@@ -140,8 +320,8 @@ async function handleGetMsg(
 
   if (!res?.channel_values.messages) {
     return NextResponse.json<MessagesResponse>(
-      { messages: [], total: 0, error: 'No messages found' },
-      { status: 400 }
+      { messages: [], total: 0 },
+      { status: 200 }
     );
   }
 
@@ -181,7 +361,11 @@ async function handleGetMsg(
 
       return {
         id: message.id || `msg_${index}`,
-        role: isHuman ? role.Human : isAI ? role.Ai : role.System,
+        role: isHuman
+          ? MessageRoles.Human
+          : isAI
+            ? MessageRoles.Ai
+            : MessageRoles.System,
         content,
         name: message.name || '',
         thinking

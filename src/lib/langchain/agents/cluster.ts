@@ -3,7 +3,7 @@ import { SystemMessage, AIMessage } from '@langchain/core/messages';
 import { AgentState } from '@/lib/types/agents';
 import { McpToolClient } from '@/lib/langchain/tools/cluster';
 import { LangChainService } from '@/lib/langchain/service';
-import { Cluster } from '@/lib/types/agents';
+import { AgentMembers } from '@/lib/types/agents';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 
 export class ClusterAgent {
@@ -39,7 +39,12 @@ export class ClusterAgent {
     const result = await this.clusterAgent.invoke(state, config);
     const lastMessage = result.messages[result.messages.length - 1];
     return {
-      messages: [new AIMessage({ content: lastMessage.content, name: Cluster })]
+      messages: [
+        new AIMessage({
+          content: lastMessage.content,
+          name: AgentMembers.ClusterAgent.name
+        })
+      ]
     };
   };
 }

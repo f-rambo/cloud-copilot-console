@@ -1,39 +1,41 @@
 import { END, Annotation } from '@langchain/langgraph';
 import { BaseMessage } from '@langchain/core/messages';
-import { MessageRoles } from '@/lib/types/chat';
 
-export const role: MessageRoles = {
-  Human: 'Human',
-  Ai: 'Ai',
-  System: 'System'
-};
+interface AgentMember {
+  ClusterAgent: AgentMemberDetails;
+  ServiceAgent: AgentMemberDetails;
+  Supervisor: AgentMemberDetails;
+}
 
-export interface AgentMember {
+interface AgentMemberDetails {
   name: string;
   description: string;
 }
 
-export const Cluster = 'ClusterAgent' as const;
-export const Service = 'ServiceAgent' as const;
-export const Supervisor = 'Supervisor' as const;
-
-export const AgentMembers: AgentMember[] = [
-  {
-    name: Cluster,
+export const AgentMembers: AgentMember = {
+  ClusterAgent: {
+    name: 'ClusterAgent',
     description: 'A cluster of machines that can be used to run jobs.'
   },
-  {
-    name: Service,
+  ServiceAgent: {
+    name: 'ServiceAgent',
     description: 'A service that can be used to run jobs.'
+  },
+  Supervisor: {
+    name: 'Supervisor',
+    description: 'A supervisor that can be used to run jobs.'
   }
-];
+};
 
-export const members = AgentMembers.map((x) => x.name);
+export const members = Object.values(AgentMembers)
+  .filter((x) => x.name !== AgentMembers.ServiceAgent.name)
+  .map((x) => x.name);
+
 export const options = [END, ...members];
 
 export const getClusterMembersSummary = (): string[] => {
-  return AgentMembers.map(
-    (member) => `${member.name}: (${member.description})`
+  return Object.values(AgentMembers).map(
+    (member) => member.name + ':' + member.description
   );
 };
 

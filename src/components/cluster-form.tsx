@@ -27,31 +27,6 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 
-interface ClusterFormProps {
-  id: string;
-  name: string;
-  provider: 'baremetal' | 'aws' | 'ali_cloud';
-  public_key: string;
-  private_key: string;
-  access_id: string;
-  access_key: string;
-  region: string;
-  node_username: string;
-  node_start_ip: string;
-  node_end_ip: string;
-}
-
-interface ClusterRegionProps {
-  access_id: string;
-  access_key: string;
-  provider: 'baremetal' | 'aws' | 'ali_cloud';
-}
-
-interface ClusterRegion {
-  id: string;
-  name: string;
-}
-
 const clusterFormSchema = z.object({
   clustername: z
     .string()
