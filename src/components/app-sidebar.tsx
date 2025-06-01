@@ -5,12 +5,10 @@ import {
   AudioWaveform,
   Command,
   GalleryVerticalEnd,
-  SquareTerminal,
   LayoutDashboard,
   Users,
-  Server,
-  CloudCog,
-  LayoutGrid
+  Cloud,
+  Blinds
 } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -66,61 +64,19 @@ const data = {
     {
       title: 'Cluster',
       url: '/dashboard/cluster',
-      icon: CloudCog,
-      items: [
-        {
-          title: 'Node',
-          url: '/dashboard/cluster/node'
-        }
-      ]
+      icon: Cloud
     },
     {
       title: 'Project',
       url: '#',
-      icon: SquareTerminal
-    },
-    {
-      title: 'App',
-      url: '#',
-      icon: LayoutGrid,
+      icon: Blinds,
       items: [
         {
-          title: 'Introduction',
+          title: 'Apps',
           url: '#'
         },
         {
-          title: 'Get Started',
-          url: '#'
-        },
-        {
-          title: 'Tutorials',
-          url: '#'
-        },
-        {
-          title: 'Changelog',
-          url: '#'
-        }
-      ]
-    },
-    {
-      title: 'Service',
-      url: '#',
-      icon: Server,
-      items: [
-        {
-          title: 'General',
-          url: '#'
-        },
-        {
-          title: 'Team',
-          url: '#'
-        },
-        {
-          title: 'Billing',
-          url: '#'
-        },
-        {
-          title: 'Limits',
+          title: 'Services',
           url: '#'
         }
       ]

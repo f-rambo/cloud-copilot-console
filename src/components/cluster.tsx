@@ -9,12 +9,10 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable
 } from '@tanstack/react-table';
 import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
-
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -53,137 +51,9 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
-
-const data: Cluster[] = [
-  {
-    id: '1',
-    name: 'cluster-1',
-    kuberentes_version: '1.25.3',
-    containerd_version: '1.6.4',
-    cilium_version: '1.13.1',
-    api_server_address: '10.0.0.1',
-    domain: 'cluster-1.example.com',
-    status: 'running',
-    provider: 'baremetal',
-    level: 'basic',
-    region: 'us-east-1',
-    node_start_ip: '10.0.0.1',
-    node_end_ip: '10.0.0.10',
-    node_number: 10
-  }
-];
-
-export interface Cluster {
-  id: string;
-  name: string;
-  kuberentes_version: string;
-  containerd_version: string;
-  cilium_version: string;
-  api_server_address: string;
-  domain: string;
-  status: 'starting' | 'running' | 'stopping' | 'stopped' | 'deleted';
-  provider: 'baremetal' | 'aws' | 'ali_cloud';
-  level: 'basic' | 'standard' | 'advanced';
-  region: string;
-  node_start_ip: string;
-  node_end_ip: string;
-  node_number: number;
-}
-
-export const columns: ColumnDef<Cluster>[] = [
-  {
-    id: 'select',
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && 'indeterminate')
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label='Select all'
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label='Select row'
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false
-  },
-  {
-    accessorKey: 'name',
-    header: 'Name'
-  },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ row }) => (
-      <div className='capitalize'>{row.getValue('status')}</div>
-    )
-  },
-  {
-    accessorKey: 'email',
-    header: ({ column }) => {
-      return (
-        <Button
-          variant='ghost'
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-        >
-          Email
-          <ArrowUpDown />
-        </Button>
-      );
-    },
-    cell: ({ row }) => <div className='lowercase'>{row.getValue('email')}</div>
-  },
-  {
-    accessorKey: 'amount',
-    header: () => <div className='text-right'>Amount</div>,
-    cell: ({ row }) => {
-      const amount = parseFloat(row.getValue('amount'));
-
-      // Format the amount as a dollar amount
-      const formatted = new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-      }).format(amount);
-
-      return <div className='text-right font-medium'>{formatted}</div>;
-    }
-  },
-  {
-    id: 'actions',
-    enableHiding: false,
-    cell: ({ row }) => {
-      const payment = row.original;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant='ghost' className='h-8 w-8 p-0'>
-              <span className='sr-only'>Open menu</span>
-              <MoreHorizontal />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align='end'>
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(payment.id)}
-            >
-              Copy payment ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>View customer</DropdownMenuItem>
-            <DropdownMenuItem>View payment details</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    }
-  }
-];
+import { ClusterListArgs, ClusterList, Cluster } from '@/lib/types/cluster';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/auth-context';
 
 export function ClusterTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -193,44 +63,243 @@ export function ClusterTable() {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+  const [loading, setLoading] = React.useState(false);
+  const [clusterData, setClusterData] = React.useState<ClusterList>({
+    clusters: [],
+    total: 0
+  });
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: 10
+  });
+  const [nameFilter, setNameFilter] = React.useState('');
   const router = useRouter();
+  const { user } = useAuth();
+
+  // 获取集群列表的函数
+  const fetchClusters = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: ClusterListArgs = {
+        page: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+        ...(nameFilter && { name: nameFilter })
+      };
+
+      const queryString = new URLSearchParams(
+        Object.entries(params)
+          .filter(
+            ([key, value]) =>
+              value !== undefined &&
+              value !== '' &&
+              key !== undefined &&
+              key !== ''
+          )
+          .map(([key, value]) => [key, value.toString()])
+      ).toString();
+
+      const response = await fetch(`/api/server/cluster/list?${queryString}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user?.token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Get cluster list error');
+      }
+
+      const data: ClusterList = await response.json();
+      setClusterData(data);
+    } catch (error) {
+      console.error(error);
+      toast.error('Get cluster list error');
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.pageIndex, pagination.pageSize, nameFilter, user?.token]);
+
+  // 初始加载和依赖变化时重新获取数据
+  React.useEffect(() => {
+    fetchClusters();
+  }, [fetchClusters]);
+
+  // 处理名称过滤
+  const handleNameFilterChange = React.useCallback((value: string) => {
+    setNameFilter(value);
+    setPagination((prev) => ({ ...prev, pageIndex: 0 })); // 重置到第一页
+  }, []);
+
+  const columns: ColumnDef<Cluster>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && 'indeterminate')
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label='Select all'
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label='Select row'
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false
+    },
+    {
+      accessorKey: 'id',
+      header: 'ID',
+      cell: ({ row }) => (
+        <div className='font-mono text-sm'>{row.getValue('id')}</div>
+      )
+    },
+    {
+      accessorKey: 'name',
+      header: ({ column }) => {
+        return (
+          <Button
+            variant='ghost'
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          >
+            Name
+            <ArrowUpDown />
+          </Button>
+        );
+      },
+      cell: ({ row }) => (
+        <div className='capitalize'>
+          <Button
+            variant='link'
+            onClick={() => {
+              router.push(
+                `/dashboard/cluster/detail?clusterid=${row.getValue('id')}`
+              );
+            }}
+          >
+            {row.getValue('name')}
+          </Button>{' '}
+        </div>
+      )
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <div className='capitalize'>{row.getValue('status')}</div>
+      )
+    },
+    {
+      accessorKey: 'provider',
+      header: 'Provider',
+      cell: ({ row }) => (
+        <div className='capitalize'>{row.getValue('provider')}</div>
+      )
+    },
+    {
+      accessorKey: 'region',
+      header: 'Region'
+    },
+    {
+      accessorKey: 'api_server_address',
+      header: 'API Server Address',
+      cell: ({ row }) => (
+        <div className='font-mono text-sm'>
+          {row.getValue('api_server_address')}
+        </div>
+      )
+    },
+    {
+      id: 'actions',
+      enableHiding: false,
+      cell: ({ row }) => {
+        const cluster = row.original;
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant='ghost' className='h-8 w-8 p-0'>
+                <span className='sr-only'>Menu</span>
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end'>
+              <DropdownMenuLabel>Action</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() =>
+                  navigator.clipboard.writeText(cluster.id.toString())
+                }
+              >
+                Copy ID
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  router.push(
+                    `/dashboard/cluster/detail?clusterid=${cluster.id}`
+                  );
+                }}
+              >
+                Detail
+              </DropdownMenuItem>
+              <DropdownMenuItem>Edit</DropdownMenuItem>
+              <DropdownMenuItem className='text-red-600'>
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      }
+    }
+  ];
+
+  // 计算总页数
+  const pageCount = Math.ceil(clusterData.total / pagination.pageSize);
 
   const table = useReactTable({
-    data,
+    data: clusterData.clusters,
     columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    pageCount,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
-      rowSelection
-    }
+      rowSelection,
+      pagination
+    },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    manualPagination: true, // 启用手动分页
+    manualFiltering: true // 启用手动过滤
   });
 
   return (
     <div className='w-full'>
       <div className='flex items-center gap-2 py-4'>
         <Input
-          placeholder='Filter clusters...'
-          value={(table.getColumn('email')?.getFilterValue() as string) ?? ''}
-          onChange={(event) =>
-            table.getColumn('email')?.setFilterValue(event.target.value)
-          }
+          placeholder='By Cluster name...'
+          value={nameFilter}
+          onChange={(event) => handleNameFilterChange(event.target.value)}
           className='max-w-sm'
         />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant='outline' className='ml-auto'>
               <ColumnsIcon />
-              <span className='hidden lg:inline'>Customize Columns</span>
-              <span className='lg:hidden'>Columns</span>
+              <span className='hidden lg:inline'>Custom columns</span>
+              <span className='lg:hidden'>column</span>
               <ChevronDownIcon />
             </Button>
           </DropdownMenuTrigger>
@@ -257,10 +326,10 @@ export function ClusterTable() {
         <Button
           variant='outline'
           size='sm'
-          onClick={() => router.push('cluster/create')}
+          onClick={() => router.push('/dashboard/cluster/create')}
         >
           <PlusIcon />
-          <span className='hidden lg:inline'>Add Section</span>
+          <span className='hidden lg:inline'>Add Cluster</span>
         </Button>
       </div>
       <div className='rounded-md border'>
@@ -283,8 +352,17 @@ export function ClusterTable() {
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody className='**:data-[slot=table-cell]:first:w-8'>
-            {table.getRowModel().rows?.length ? (
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className='h-24 text-center'
+                >
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -306,7 +384,7 @@ export function ClusterTable() {
                   colSpan={columns.length}
                   className='h-24 text-center'
                 >
-                  No results.
+                  No data yet
                 </TableCell>
               </TableRow>
             )}
@@ -315,8 +393,8 @@ export function ClusterTable() {
       </div>
       <div className='flex items-center justify-between p-3 px-4'>
         <div className='text-muted-foreground hidden flex-1 text-sm lg:flex'>
-          {table.getFilteredSelectedRowModel().rows.length} of{' '}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
+          Already selected {table.getFilteredSelectedRowModel().rows.length}{' '}
+          row, {clusterData.total} rows in total
         </div>
         <div className='flex w-full items-center gap-8 lg:w-fit'>
           <div className='hidden items-center gap-2 lg:flex'>
@@ -324,15 +402,17 @@ export function ClusterTable() {
               Rows per page
             </Label>
             <Select
-              value={`${table.getState().pagination.pageSize}`}
+              value={`${pagination.pageSize}`}
               onValueChange={(value) => {
-                table.setPageSize(Number(value));
+                setPagination((prev) => ({
+                  ...prev,
+                  pageSize: Number(value),
+                  pageIndex: 0 // 重置到第一页
+                }));
               }}
             >
               <SelectTrigger className='w-20' id='rows-per-page'>
-                <SelectValue
-                  placeholder={table.getState().pagination.pageSize}
-                />
+                <SelectValue placeholder={pagination.pageSize} />
               </SelectTrigger>
               <SelectContent side='top'>
                 {[10, 20, 30, 40, 50].map((pageSize) => (
@@ -344,47 +424,60 @@ export function ClusterTable() {
             </Select>
           </div>
           <div className='flex w-fit items-center justify-center text-sm font-medium'>
-            Page {table.getState().pagination.pageIndex + 1} of{' '}
-            {table.getPageCount()}
+            {pagination.pageIndex + 1} page {pageCount} of
           </div>
           <div className='ml-auto flex items-center gap-2 lg:ml-0'>
             <Button
               variant='outline'
               className='hidden h-8 w-8 p-0 lg:flex'
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() =>
+                setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+              }
+              disabled={pagination.pageIndex === 0 || loading}
             >
-              <span className='sr-only'>Go to first page</span>
+              <span className='sr-only'>Jump to first page </span>
               <ChevronsLeftIcon />
             </Button>
             <Button
               variant='outline'
               className='size-8'
               size='icon'
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  pageIndex: prev.pageIndex - 1
+                }))
+              }
+              disabled={pagination.pageIndex === 0 || loading}
             >
-              <span className='sr-only'>Go to previous page</span>
+              <span className='sr-only'>Previous page</span>
               <ChevronLeftIcon />
             </Button>
             <Button
               variant='outline'
               className='size-8'
               size='icon'
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  pageIndex: prev.pageIndex + 1
+                }))
+              }
+              disabled={pagination.pageIndex >= pageCount - 1 || loading}
             >
-              <span className='sr-only'>Go to next page</span>
+              <span className='sr-only'>Next page</span>
               <ChevronRightIcon />
             </Button>
             <Button
               variant='outline'
               className='hidden size-8 lg:flex'
               size='icon'
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
+              onClick={() =>
+                setPagination((prev) => ({ ...prev, pageIndex: pageCount - 1 }))
+              }
+              disabled={pagination.pageIndex >= pageCount - 1 || loading}
             >
-              <span className='sr-only'>Go to last page</span>
+              <span className='sr-only'>Jump to the last page</span>
               <ChevronsRightIcon />
             </Button>
           </div>

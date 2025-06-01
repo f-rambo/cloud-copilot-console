@@ -1,13 +1,6 @@
-export const dynamic = 'force-dynamic';
-
 const serverUrl = `${process.env.SERVER_API_URL ?? ''}${
   process.env.API_VERSION ?? ''
 }`;
-
-const accessToken = '';
-const provider = '';
-const email = '';
-const userId = '';
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -16,10 +9,6 @@ export async function GET(request: Request) {
 
   const newUrl = serverUrl + url.pathname;
   const serachParanms = new URLSearchParams(url.searchParams).toString();
-  const newHeaders = new Headers(request.headers);
-  newHeaders.append('Authorization', provider + ' ' + accessToken);
-  newHeaders.append('User-Email', email);
-  newHeaders.append('User-Id', userId);
 
   const encodedSearchParams = serachParanms
     .split('&')
@@ -33,7 +22,7 @@ export async function GET(request: Request) {
     newUrl + (encodedSearchParams ? '?' + encodedSearchParams : ''),
     {
       method: 'GET',
-      headers: newHeaders
+      headers: request.headers
     }
   );
 
@@ -45,14 +34,10 @@ export async function POST(request: Request) {
   url.pathname = url.pathname.replace(/\/.*\/server/, '');
 
   const newUrl = serverUrl + url.pathname;
-  const newHeaders = new Headers(request.headers);
-  newHeaders.append('Authorization', provider + ' ' + accessToken);
-  newHeaders.append('User-Email', email);
-  newHeaders.append('User-Id', userId);
 
   const forwardedResponse = await fetch(newUrl, {
     method: 'POST',
-    headers: newHeaders,
+    headers: request.headers,
     body: await request.clone().text()
   });
 
@@ -64,14 +49,10 @@ export async function PUT(request: Request) {
   url.pathname = url.pathname.replace(/\/.*\/server/, '');
 
   const newUrl = serverUrl + url.pathname;
-  const newHeaders = new Headers(request.headers);
-  newHeaders.append('Authorization', provider + ' ' + accessToken);
-  newHeaders.append('User-Email', email);
-  newHeaders.append('User-Id', userId);
 
   const forwardedResponse = await fetch(newUrl, {
     method: 'PUT',
-    headers: newHeaders,
+    headers: request.headers,
     body: await request.clone().text()
   });
 
@@ -83,12 +64,8 @@ export async function DELETE(request: Request) {
   url.pathname = url.pathname.replace(/\/.*\/server/, '');
 
   const newUrl = serverUrl + url.pathname;
-  const newHeaders = new Headers(request.headers);
 
   const serachParanms = new URLSearchParams(url.searchParams).toString();
-  newHeaders.append('Authorization', provider + ' ' + accessToken);
-  newHeaders.append('User-Email', email);
-  newHeaders.append('User-Id', userId);
 
   const encodedSearchParams = serachParanms
     .split('&')
@@ -102,7 +79,7 @@ export async function DELETE(request: Request) {
     newUrl + (encodedSearchParams ? '?' + encodedSearchParams : ''),
     {
       method: 'DELETE',
-      headers: newHeaders
+      headers: request.headers
     }
   );
 
