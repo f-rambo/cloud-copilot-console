@@ -5,5 +5,5 @@ export interface User {
   image: string;
   token: string;
   status: string;
-  expires: string; // "2024-03-20T10:30:00.000Z" ISO 8601
+  expires: string; // Unix: 1748841830
 }

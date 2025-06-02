@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { User } from '@/lib/types/user';
 
-const publicRoutes = ['/login'];
+const publicRoutes = ['/login', '/api/server/user/signin'];
 
 export function middleware(request: NextRequest) {
-  console.log('middleware', request.nextUrl.pathname);
   const userCookie = request.cookies.get('user');
 
   if (!userCookie && !publicRoutes.includes(request.nextUrl.pathname)) {
@@ -20,8 +19,10 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/login', request.url));
       }
 
-      const expiryTime = new Date(userData.expires).getTime();
-      const currentTime = new Date().getTime();
+      const expiryTime = Math.floor(
+        new Date(Number(userData.expires) * 1000).getTime() / 1000
+      );
+      const currentTime = Math.floor(Date.now() / 1000);
 
       if (currentTime >= expiryTime) {
         const response = NextResponse.redirect(new URL('/login', request.url));

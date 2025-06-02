@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { Send, Bot, Plus, History, Trash2 } from 'lucide-react';
+import { Send, Sparkles, Plus, History, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Markdown } from '@/components/ui/markdown';
 import { FormattedMessage, MessageRoles } from '@/lib/types/chat';
@@ -345,12 +345,12 @@ export function CardsChat() {
           <TooltipTrigger asChild>
             <SheetTrigger asChild>
               <Button variant='outline' size='icon'>
-                <Bot />
+                <Sparkles />
               </Button>
             </SheetTrigger>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Chat bot</p>
+            <p>Ask cloud copilot</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

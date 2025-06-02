@@ -117,7 +117,14 @@ export interface ClusterListArgs {
 export interface NodeGroup {
   id: string;
   name: string;
-  type: string;
+  type:
+    | 'normal'
+    | 'high_computation'
+    | 'gpu_accelerated'
+    | 'high_memory'
+    | 'large_hard_disk'
+    | 'load_disk'
+    | 'unspecified';
   os: string;
   arch: string;
   cpu: number;
@@ -137,8 +144,17 @@ export interface Node {
   ip: string;
   name: string;
   user: string;
-  role: string;
-  status: string;
+  role: 'master' | 'worker' | 'edge' | 'unspecified';
+  status:
+    | 'node_ready'
+    | 'node_finding'
+    | 'node_creating'
+    | 'node_pending'
+    | 'node_running'
+    | 'node_deleting'
+    | 'node_deleted'
+    | 'node_error'
+    | 'unspecified';
   instance_id: string;
 }
 
@@ -155,7 +171,15 @@ export interface Cluster {
   id: number;
   name: string;
   api_server_address: string;
-  status: string;
+  status:
+    | 'unspecified'
+    | 'starting'
+    | 'running'
+    | 'stopping'
+    | 'stopped'
+    | 'deleted'
+    | 'error';
+  level: 'basic' | 'standard' | 'advanced' | 'unspecified';
   domain: string;
   node_number: number;
   provider: string;

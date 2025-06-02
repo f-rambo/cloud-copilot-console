@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (userData: User) => {
     try {
-      const expiryTime = new Date(userData.expires);
+      const expiryTime = new Date(Number(userData.expires) * 1000);
       if (isNaN(expiryTime.getTime())) {
         throw new Error('Invalid expiry time format');
       }

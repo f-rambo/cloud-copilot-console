@@ -7,7 +7,7 @@ import {
   GalleryVerticalEnd,
   LayoutDashboard,
   Users,
-  Cloud,
+  Cloudy,
   Blinds
 } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
@@ -64,7 +64,7 @@ const data = {
     {
       title: 'Cluster',
       url: '/dashboard/cluster',
-      icon: Cloud
+      icon: Cloudy
     },
     {
       title: 'Project',

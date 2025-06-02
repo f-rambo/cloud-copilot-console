@@ -33,8 +33,6 @@ export function LoginForm({
     }
   });
 
-  const userApi = process.env.NEXT_PUBLIC_API_URL + `/user/`;
-
   const onSubmit = async (values: FormValues) => {
     try {
       const submitData = {
@@ -42,7 +40,7 @@ export function LoginForm({
         password: MD5(values.password).toString()
       };
 
-      const response = await fetch(userApi + 'signin', {
+      const response = await fetch('api/server/user/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

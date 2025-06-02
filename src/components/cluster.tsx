@@ -12,7 +12,12 @@ import {
   getSortedRowModel,
   useReactTable
 } from '@tanstack/react-table';
-import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
+import {
+  ArrowUpDown,
+  MoreHorizontal,
+  CheckCircle2Icon,
+  LoaderIcon
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -54,6 +59,7 @@ import { useRouter } from 'next/navigation';
 import { ClusterListArgs, ClusterList, Cluster } from '@/lib/types/cluster';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth-context';
+import { Badge } from '@/components/ui/badge';
 
 export function ClusterTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -78,6 +84,10 @@ export function ClusterTable() {
 
   // 获取集群列表的函数
   const fetchClusters = React.useCallback(async () => {
+    if (!user?.token) {
+      return;
+    }
+
     setLoading(true);
     try {
       const params: ClusterListArgs = {
@@ -102,7 +112,7 @@ export function ClusterTable() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${user?.token}`
+          Authorization: `Bearer ${user.token}`
         }
       });
       if (!response.ok) {
@@ -184,7 +194,7 @@ export function ClusterTable() {
             }}
           >
             {row.getValue('name')}
-          </Button>{' '}
+          </Button>
         </div>
       )
     },
@@ -192,14 +202,41 @@ export function ClusterTable() {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }) => (
-        <div className='capitalize'>{row.getValue('status')}</div>
+        <Badge
+          variant='outline'
+          className='text-muted-foreground flex gap-1 px-1.5 capitalize [&_svg]:size-3'
+        >
+          {row.original.status === 'running' ? (
+            <CheckCircle2Icon className='text-green-500 dark:text-green-400' />
+          ) : (
+            <LoaderIcon />
+          )}
+          {row.getValue('status')}
+        </Badge>
       )
     },
     {
       accessorKey: 'provider',
       header: 'Provider',
       cell: ({ row }) => (
-        <div className='capitalize'>{row.getValue('provider')}</div>
+        <Badge
+          variant='outline'
+          className='text-muted-foreground px-1.5 capitalize'
+        >
+          {row.getValue('provider')}
+        </Badge>
+      )
+    },
+    {
+      accessorKey: 'level',
+      header: 'Level',
+      cell: ({ row }) => (
+        <Badge
+          variant='outline'
+          className='text-muted-foreground px-1.5 capitalize'
+        >
+          {row.getValue('level')}
+        </Badge>
       )
     },
     {

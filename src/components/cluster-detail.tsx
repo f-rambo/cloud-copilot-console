@@ -13,7 +13,13 @@ import {
   useReactTable,
   VisibilityState
 } from '@tanstack/react-table';
-import { TrendingUpIcon, ArrowUpDown, ChevronDown } from 'lucide-react';
+import {
+  TrendingUpIcon,
+  ArrowUpDown,
+  ChevronDown,
+  CheckCircle2Icon,
+  LoaderIcon
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -50,6 +56,7 @@ import {
 } from '@/components/ui/chart';
 import { Area, AreaChart, CartesianGrid, XAxis } from 'recharts';
 import { ChartAreaInteractive } from '@/components/cluster-chart-area-interactive';
+import { Badge } from '@/components/ui/badge';
 
 // Node columns definition
 const nodeColumns: ColumnDef<Node>[] = [
@@ -88,13 +95,30 @@ const nodeColumns: ColumnDef<Node>[] = [
   {
     accessorKey: 'role',
     header: 'Role',
-    cell: ({ row }) => <div className='capitalize'>{row.getValue('role')}</div>
+    cell: ({ row }) => (
+      <Badge
+        variant='outline'
+        className='text-muted-foreground px-1.5 capitalize'
+      >
+        {row.getValue('role')}
+      </Badge>
+    )
   },
   {
     accessorKey: 'status',
     header: 'Status',
     cell: ({ row }) => (
-      <div className='capitalize'>{row.getValue('status')}</div>
+      <Badge
+        variant='outline'
+        className='text-muted-foreground flex gap-1 px-1.5 capitalize [&_svg]:size-3'
+      >
+        {row.original.status === 'node_running' ? (
+          <CheckCircle2Icon className='text-green-500 dark:text-green-400' />
+        ) : (
+          <LoaderIcon />
+        )}
+        {row.getValue('status')}
+      </Badge>
     )
   },
   {
@@ -129,17 +153,38 @@ const nodeGroupColumns: ColumnDef<NodeGroup>[] = [
   {
     accessorKey: 'type',
     header: 'Type',
-    cell: ({ row }) => <div className='capitalize'>{row.getValue('type')}</div>
+    cell: ({ row }) => (
+      <Badge
+        variant='outline'
+        className='text-muted-foreground px-1.5 capitalize'
+      >
+        {row.getValue('type')}
+      </Badge>
+    )
   },
   {
     accessorKey: 'os',
     header: 'OS',
-    cell: ({ row }) => <div>{row.getValue('os')}</div>
+    cell: ({ row }) => (
+      <Badge
+        variant='outline'
+        className='text-muted-foreground px-1.5 capitalize'
+      >
+        {row.getValue('os')}
+      </Badge>
+    )
   },
   {
     accessorKey: 'arch',
     header: 'Architecture',
-    cell: ({ row }) => <div>{row.getValue('arch')}</div>
+    cell: ({ row }) => (
+      <Badge
+        variant='outline'
+        className='text-muted-foreground px-1.5 capitalize'
+      >
+        {row.getValue('arch')}
+      </Badge>
+    )
   },
   {
     accessorKey: 'cpu',
@@ -154,7 +199,14 @@ const nodeGroupColumns: ColumnDef<NodeGroup>[] = [
   {
     accessorKey: 'target_size',
     header: 'Target Size',
-    cell: ({ row }) => <div>{row.getValue('target_size')}</div>
+    cell: ({ row }) => (
+      <Badge
+        variant='outline'
+        className='text-muted-foreground px-1.5 capitalize'
+      >
+        {row.getValue('target_size')}
+      </Badge>
+    )
   }
 ];
 
@@ -180,13 +232,17 @@ export function ClusterDetails({ clusterId }: { clusterId: string }) {
   const fetchClusterDetails = React.useCallback(async () => {
     if (!clusterId) return;
 
+    if (!user?.token) {
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch(`/api/server/cluster?id=${clusterId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          ...(user?.token && { Authorization: `Bearer ${user.token}` })
+          Authorization: `Bearer ${user.token}`
         }
       });
 
