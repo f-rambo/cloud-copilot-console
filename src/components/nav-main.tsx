@@ -69,11 +69,13 @@ export function NavMain({
                   </CollapsibleContent>
                 </>
               ) : (
-                <SidebarMenuButton tooltip={item.title} asChild>
-                  <a href={item.url}>
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
-                  </a>
+                <SidebarMenuButton
+                  tooltip={item.title}
+                  asChild={false}
+                  onClick={() => router.push(item.url)}
+                >
+                  {item.icon && <item.icon />}
+                  <span>{item.title}</span>
                 </SidebarMenuButton>
               )}
             </SidebarMenuItem>

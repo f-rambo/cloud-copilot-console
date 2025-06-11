@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useRef } from 'react';
-import { MotionValue, motion, useScroll, useTransform } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,62 +15,167 @@ interface Node {
   y: number;
 }
 
-const nodes: Node[] = [
-  { id: '1', type: 'logic', title: 'Logic', x: 50, y: 200 },
+// 首先定义原始节点的接口类型
+interface RawNode {
+  id: string;
+  type: 'logic' | 'input' | 'output' | 'request';
+  title: string;
+  value?: string;
+}
+
+interface Node extends RawNode {
+  x: number;
+  y: number;
+}
+
+// 节点位置计算函数
+const calculateNodePosition = (
+  index: number,
+  nodeType: string,
+  allRawNodes: RawNode[] // 使用正确的类型替代any[]
+) => {
+  const containerWidth = 1000; // 容器宽度
+  const containerHeight = 700; // 容器高度
+  const nodeWidth = 160; // 节点宽度
+  const nodeHeight = 60; // 节点高度
+  const padding = 60; // 边距
+  const minSpacing = 20; // 节点间最小间距
+
+  // 根据节点类型分层布局
+  const typeLayerMap = {
+    logic: 0, // 第一层：逻辑节点
+    input: 1, // 第二层：输入节点
+    request: 1, // 第二层：请求节点
+    output: 2 // 第三层：输出节点
+  };
+
+  const layer = typeLayerMap[nodeType as keyof typeof typeLayerMap] || 0;
+  const layerWidth = (containerWidth - padding * 2) / 3; // 分为3层
+
+  // 计算同类型节点的数量和当前节点在同类型中的索引
+  const sameTypeNodes = allRawNodes.filter((node) => {
+    const nodeLayer = typeLayerMap[node.type as keyof typeof typeLayerMap] || 0;
+    return nodeLayer === layer;
+  });
+  const sameTypeIndex = sameTypeNodes.findIndex(
+    (node) => node.id === allRawNodes[index].id
+  );
+  const sameTypeCount = sameTypeNodes.length;
+
+  // X坐标：根据层级分布
+  const x = padding + layer * layerWidth;
+
+  // Y坐标：在该层内垂直分布，确保有足够间距
+  const availableHeight = containerHeight - padding * 2;
+  const totalNodeHeight =
+    sameTypeCount * nodeHeight + (sameTypeCount - 1) * minSpacing;
+
+  let y;
+  if (totalNodeHeight <= availableHeight) {
+    // 如果总高度小于可用高度，均匀分布
+    const ySpacing =
+      sameTypeCount > 1
+        ? (availableHeight - nodeHeight) / (sameTypeCount - 1)
+        : availableHeight / 2;
+    y =
+      padding +
+      (sameTypeCount > 1
+        ? sameTypeIndex * ySpacing
+        : availableHeight / 2 - nodeHeight / 2);
+  } else {
+    // 如果空间不够，紧密排列
+    y = padding + sameTypeIndex * (nodeHeight + minSpacing);
+  }
+
+  return {
+    x: Math.max(padding, Math.min(x, containerWidth - nodeWidth - padding)),
+    y: Math.max(padding, Math.min(y, containerHeight - nodeHeight - padding))
+  };
+};
+
+// 原始节点数据（不包含x, y坐标）
+const rawNodes: RawNode[] = [
+  { id: '1', type: 'logic', title: 'Logic' },
   {
     id: '2',
     type: 'input',
     title: 'Input',
-    value: 'logic was resolved to TRUE',
-    x: 300,
-    y: 100
+    value: 'logic was resolved to TRUE'
   },
   {
     id: '3',
     type: 'input',
     title: 'Input',
-    value: 'logic was resolved to FAIL',
-    x: 300,
-    y: 250
+    value: 'logic was resolved to FAIL'
   },
-  { id: '4', type: 'input', title: 'Input', value: '2500', x: 300, y: 400 },
+  { id: '4', type: 'input', title: 'Input', value: '2500' },
   {
     id: '5',
     type: 'request',
     title: 'Request',
-    value: 'https://api.example.com/v1/data',
-    x: 300,
-    y: 550
+    value: 'https://api.example.com/v1/data'
   },
-  { id: '6', type: 'output', title: 'Output', value: '2500', x: 550, y: 400 },
-  { id: '7', type: 'output', title: 'Output', x: 800, y: 300 }
+  { id: '6', type: 'output', title: 'Output', value: '2500' },
+  { id: '7', type: 'output', title: 'Output' }
 ];
 
+// 使用位置计算函数生成完整的节点数据
+const nodes: Node[] = rawNodes.map((node, index) => {
+  const position = calculateNodePosition(
+    index,
+    node.type,
+    rawNodes // 移除了totalNodes参数
+  );
+  return {
+    ...node,
+    x: position.x,
+    y: position.y
+  };
+});
+
 const connections = [
-  { from: '1', to: '2', color: '#FFB7C5' },
-  { from: '1', to: '3', color: '#FFDDB7' },
-  { from: '1', to: '4', color: '#B1C5FF' },
-  { from: '1', to: '5', color: '#4FABFF' },
-  { from: '2', to: '7', color: '#076EFF' },
-  { from: '3', to: '7', color: '#FFB7C5' },
-  { from: '4', to: '6', color: '#FFDDB7' },
-  { from: '6', to: '7', color: '#B1C5FF' },
-  { from: '5', to: '7', color: '#4FABFF' }
+  { from: '1', to: '2' },
+  { from: '1', to: '3' },
+  { from: '1', to: '4' },
+  { from: '1', to: '5' },
+  { from: '2', to: '7' },
+  { from: '3', to: '7' },
+  { from: '4', to: '6' },
+  { from: '6', to: '7' },
+  { from: '5', to: '7' }
 ];
+
 const transition = {
-  duration: 0,
-  ease: 'linear'
+  duration: 0.5,
+  ease: 'easeInOut'
 };
-export function WorkflowComponent({
-  pathLengths
-}: {
-  pathLengths: MotionValue[];
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ['start end', 'end start']
-  });
+
+const colors = [
+  'rgb(59 130 246)', // blue-500
+  'rgb(168 85 247)', // purple-500
+  'rgb(34 197 94)', // green-500
+  'rgb(245 158 11)', // amber-500
+  'rgb(239 68 68)', // red-500
+  'rgb(6 182 212)', // cyan-500
+  'rgb(236 72 153)', // pink-500
+  'rgb(139 69 19)', // orange-600
+  'rgb(16 185 129)', // emerald-500
+  'rgb(99 102 241)' // indigo-500
+];
+
+// 在WorkflowComponent中，更新节点的宽度样式
+export function WorkflowComponent() {
+  const [connectionColors, setConnectionColors] = useState<string[]>([]);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // Generate random colors only on client side
+    const randomColors = connections.map(
+      () => colors[Math.floor(Math.random() * colors.length)]
+    );
+    setConnectionColors(randomColors);
+    setIsClient(true);
+  }, []);
 
   const getNodeById = (id: string) => nodes.find((node) => node.id === id);
 
@@ -85,13 +190,13 @@ export function WorkflowComponent({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className='sticky top-80 h-[800px] w-full overflow-hidden p-4'
-    >
+    <div className='relative h-[800px] w-full overflow-hidden p-4'>
       <div className='absolute inset-0 grid grid-cols-[repeat(40,1fr)] grid-rows-[repeat(40,1fr)] opacity-10'>
         {Array.from({ length: 1600 }).map((_, i) => (
-          <div key={i} className='border-[0.5px] border-gray-500' />
+          <div
+            key={i}
+            className='border-[0.5px] border-neutral-500/30 dark:border-neutral-600/30'
+          />
         ))}
       </div>
 
@@ -106,18 +211,22 @@ export function WorkflowComponent({
             toNode.y + 30
           );
 
+          // Use a default color during SSR, then switch to random color on client
+          const strokeColor =
+            isClient && connectionColors[index]
+              ? connectionColors[index]
+              : 'rgb(156 163 175)'; // gray-400 as fallback
+
           return (
             <motion.path
               key={index}
               d={path}
-              stroke={connection.color}
-              style={{
-                pathLength: pathLengths[index]
-              }}
+              stroke={strokeColor}
               strokeWidth={2}
               fill='none'
               initial={{ pathLength: 0 }}
-              transition={transition}
+              animate={{ pathLength: 1 }}
+              transition={{ ...transition, delay: index * 0.1 }}
             />
           );
         })}
@@ -134,79 +243,45 @@ export function WorkflowComponent({
         >
           <Card
             className={cn(
-              'w-[200px] border-gray-800 bg-gray-900',
-              node.type === 'logic' && 'border-blue-500',
-              node.type === 'request' && 'border-purple-500'
+              'w-[160px] border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900', // 宽度从200px改为160px
+              node.type === 'logic' && 'border-blue-500 dark:border-blue-400',
+              node.type === 'request' &&
+                'border-amber-500 dark:border-amber-400',
+              node.type === 'input' && 'border-green-500 dark:border-green-400',
+              node.type === 'output' &&
+                'border-purple-500 dark:border-purple-400'
             )}
           >
-            <CardContent className='p-4'>
-              <div className='mb-2 flex items-center gap-2'>
+            <CardContent className='p-3'>
+              {' '}
+              {/* padding从p-4改为p-3 */}
+              <div className='mb-1 flex items-center gap-2'>
+                {' '}
+                {/* margin从mb-2改为mb-1 */}
                 <div
                   className={cn(
                     'size-2 rounded-full',
                     node.type === 'logic' && 'bg-blue-500',
-                    node.type === 'input' && 'bg-gray-400',
-                    node.type === 'output' && 'bg-gray-400',
-                    node.type === 'request' && 'bg-purple-500'
+                    node.type === 'input' && 'bg-green-500',
+                    node.type === 'output' && 'bg-purple-500',
+                    node.type === 'request' && 'bg-amber-500'
                   )}
                 />
-                <span className='text-sm text-gray-400'>{node.title}</span>
+                <span className='text-sm text-neutral-600 dark:text-neutral-400'>
+                  {node.title}
+                </span>
               </div>
               {node.value && (
-                <p className='text-xs break-all text-gray-500'>{node.value}</p>
+                <p className='line-clamp-2 text-xs break-all text-neutral-500 dark:text-neutral-500'>
+                  {' '}
+                  {/* 添加line-clamp-2限制行数 */}
+                  {node.value}
+                </p>
               )}
             </CardContent>
           </Card>
         </motion.div>
       ))}
-    </div>
-  );
-}
-
-export function WorkFlowDemo({
-  title,
-  description
-}: {
-  title?: string;
-  description?: string;
-}) {
-  const ref = React.useRef(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ['start start', 'end start']
-  });
-
-  const pathLengthFirst = useTransform(scrollYProgress, [0, 0.8], [0.2, 1.2]);
-  const pathLengthSecond = useTransform(scrollYProgress, [0, 0.8], [0.15, 1.2]);
-  const pathLengthThird = useTransform(scrollYProgress, [0, 0.8], [0.1, 1.2]);
-  const pathLengthFourth = useTransform(scrollYProgress, [0, 0.8], [0.05, 1.2]);
-  const pathLengthFifth = useTransform(scrollYProgress, [0, 0.8], [0, 1.2]);
-  const pathLengthSix = useTransform(scrollYProgress, [0, 0.8], [0, 1.2]);
-
-  return (
-    <div
-      className='relative h-[400vh] w-full overflow-clip rounded-md dark:border dark:border-white/[0.1]'
-      ref={ref}
-    >
-      <p className='bg-clip-text pb-4 text-center text-lg font-normal md:text-7xl'>
-        {title || `Build with BuouUI`}
-      </p>
-      <p className='mx-auto mt-4 max-w-lg text-center text-xs font-normal text-neutral-400 md:text-xl'>
-        {description || `Scroll this component and see the workflow!`}
-      </p>
-      <WorkflowComponent
-        pathLengths={[
-          pathLengthFirst,
-          pathLengthSecond,
-          pathLengthThird,
-          pathLengthFourth,
-          pathLengthFifth,
-          pathLengthSix,
-          pathLengthSix,
-          pathLengthSix,
-          pathLengthSix
-        ]}
-      />
     </div>
   );
 }

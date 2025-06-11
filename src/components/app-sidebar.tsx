@@ -42,13 +42,13 @@ const data = {
   navMain: [
     {
       title: 'Dashboard',
-      url: '/dashboard',
+      url: '/home/dashboard',
       icon: LayoutDashboard,
       isActive: true
     },
     {
       title: 'Workspace',
-      url: '#',
+      url: '/home/workspace',
       icon: Users,
       items: [
         {
@@ -63,21 +63,21 @@ const data = {
     },
     {
       title: 'Cluster',
-      url: '/dashboard/cluster',
+      url: '/home/cluster',
       icon: Cloudy
     },
     {
       title: 'Project',
-      url: '#',
+      url: '/home/project',
       icon: Blinds,
       items: [
         {
           title: 'Apps',
-          url: '#'
+          url: '/home/project/app'
         },
         {
           title: 'Services',
-          url: '#'
+          url: '/home/project/service'
         }
       ]
     }

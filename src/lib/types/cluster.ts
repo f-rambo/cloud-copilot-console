@@ -197,3 +197,7 @@ export interface ClusterList {
   clusters: Cluster[];
   total: number;
 }
+
+export interface ClusterIdsArgs {
+  ids: number[];
+}

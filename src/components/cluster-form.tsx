@@ -276,7 +276,7 @@ export function ClusterForm() {
             ? 'Cluster updated successfully'
             : 'Cluster created successfully'
         );
-        router.push('/dashboard/cluster');
+        router.push('/home/cluster');
       } else {
         const error = await response.text();
         toast.error(error || 'Failed to save cluster');
@@ -538,7 +538,7 @@ export function ClusterForm() {
             <Button
               type='button'
               variant='outline'
-              onClick={() => router.push('/dashboard/cluster')}
+              onClick={() => router.push('/cluster')}
             >
               Cancel
             </Button>

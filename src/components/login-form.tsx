@@ -52,7 +52,7 @@ export function LoginForm({
       if (response.ok) {
         const data = await response.json();
         login(data);
-        router.push('/dashboard');
+        router.push('/home');
       } else {
         const errorData = await response.json();
         if (errorData.field) {
