@@ -97,12 +97,13 @@ export function WorkspaceForm() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [selectClusters, setSelectClusters] = useState<Cluster[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [loadingClusters, setLoadingClusters] = useState(false);
 
   const [clusterPage, setClusterPage] = useState(0);
   const [hasMoreClusters, setHasMoreClusters] = useState(true);
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 1;
   const [searchClusterName, setSearchClusterName] = useState('');
 
   const workspaceId = searchParams.get('workspaceid');
@@ -185,14 +186,24 @@ export function WorkspaceForm() {
 
         if (response.ok) {
           const data: ClusterList = await response.json();
+          setClusters((prevClusters) => {
+            const uniqueClusters = new Map();
+            prevClusters.forEach((cluster) => {
+              uniqueClusters.set(cluster.id, cluster);
+            });
+            (data.clusters || []).forEach((cluster) => {
+              uniqueClusters.set(cluster.id, cluster);
+            });
+            return Array.from(uniqueClusters.values());
+          });
           if (page === 1) {
             const newClusters = data.clusters || [];
             setHasMoreClusters(newClusters.length < data.total);
-            setClusters(newClusters);
+            setSelectClusters(newClusters);
             console.log(newClusters.length);
             return;
           }
-          setClusters((prevClusters) => {
+          setSelectClusters((prevClusters) => {
             const uniqueClusters = new Map();
             prevClusters.forEach((cluster) => {
               uniqueClusters.set(cluster.id, cluster);
@@ -238,12 +249,12 @@ export function WorkspaceForm() {
             const workspace: Workspace = await response.json();
 
             // Extract cluster IDs and permissions from relationships
-            const clusterIds = workspace.cluster_relationships.map((rel) =>
-              Number(rel.cluster_id)
+            const clusterIds = workspace.cluster_relationships.map(
+              (rel) => rel.cluster_id
             );
 
             form.reset({
-              id: Number(workspace.id),
+              id: workspace.id,
               name: workspace.name,
               description: workspace.description,
               git_repository: workspace.git_repository,
@@ -316,15 +327,14 @@ export function WorkspaceForm() {
   };
 
   // Helper function to handle cluster selection
-  // Helper function to handle cluster selection
   const handleClusterSelection = (clusterId: number, checked: boolean) => {
     const currentIds = form.getValues('cluster_ids');
     if (checked && !currentIds.includes(clusterId)) {
-      form.setValue('cluster_ids', [...currentIds, Number(clusterId)]);
+      form.setValue('cluster_ids', [...currentIds, clusterId]);
     } else if (!checked) {
       form.setValue(
         'cluster_ids',
-        currentIds.filter((id) => Number(id) !== Number(clusterId))
+        currentIds.filter((id) => id !== clusterId)
       );
     }
   };
@@ -709,7 +719,7 @@ export function WorkspaceForm() {
                                   .getValues('cluster_ids')
                                   .map((clusterId) => {
                                     const cluster = clusters.find(
-                                      (c) => Number(c.id) === Number(clusterId)
+                                      (c) => c.id === clusterId
                                     );
                                     return (
                                       <Badge
@@ -724,7 +734,7 @@ export function WorkspaceForm() {
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                               handleClusterSelection(
-                                                Number(clusterId),
+                                                clusterId,
                                                 false
                                               );
                                             }
@@ -735,7 +745,7 @@ export function WorkspaceForm() {
                                           }}
                                           onClick={() =>
                                             handleClusterSelection(
-                                              Number(clusterId),
+                                              clusterId,
                                               false
                                             )
                                           }
@@ -772,18 +782,17 @@ export function WorkspaceForm() {
                                 <CommandEmpty>No cluster found.</CommandEmpty>
                               )}
                               <CommandGroup>
-                                {clusters.map((cluster) => {
+                                {selectClusters.map((cluster) => {
                                   const isSelected = form
                                     .getValues('cluster_ids')
-                                    .includes(Number(cluster.id));
+                                    .includes(cluster.id);
                                   return (
                                     <CommandItem
                                       key={cluster.id}
-                                      value={cluster.id.toString()}
-                                      onSelect={(value) => {
-                                        const clusterId = parseInt(value, 10);
+                                      value={cluster.name}
+                                      onSelect={() => {
                                         handleClusterSelection(
-                                          clusterId,
+                                          cluster.id,
                                           !isSelected
                                         );
                                       }}
