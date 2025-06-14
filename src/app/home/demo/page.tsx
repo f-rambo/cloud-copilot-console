@@ -1,9 +1,9 @@
-import { WinTypingText } from '@/components/window-text';
+import { ClusterSelect } from '@/components/cluster-search-select';
 
 export default function Page() {
   return (
     <div className='p-4'>
-      <WinTypingText />
+      <ClusterSelect />
     </div>
   );
 }

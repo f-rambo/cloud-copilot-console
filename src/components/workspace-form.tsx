@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,7 +23,6 @@ import { ResourceQuota } from '@/lib/types/common';
 import { ClusterListArgs, Cluster, ClusterList } from '@/lib/types/cluster';
 import { useAuth } from '@/contexts/auth-context';
 import { Check, ChevronDown, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import {
   Command,
   CommandEmpty,
@@ -100,8 +99,11 @@ export function WorkspaceForm() {
   const [loading, setLoading] = useState(false);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [loadingClusters, setLoadingClusters] = useState(false);
-  // 添加这一行来控制 Popover 状态
-  const [open, setOpen] = useState(false);
+
+  const [clusterPage, setClusterPage] = useState(0);
+  const [hasMoreClusters, setHasMoreClusters] = useState(true);
+  const PAGE_SIZE = 10;
+  const [searchClusterName, setSearchClusterName] = useState('');
 
   const workspaceId = searchParams.get('workspaceid');
   const isEditing = !!workspaceId;
@@ -141,19 +143,23 @@ export function WorkspaceForm() {
     }
   }, [form.formState.errors]);
 
-  // Load clusters
-  useEffect(() => {
-    const fetchClusters = async () => {
+  const loadClusters = useCallback(
+    async (searchClusterName: string, page: number) => {
       if (!user?.token) {
         return;
       }
 
       setLoadingClusters(true);
+      setSearchClusterName(searchClusterName);
+      setClusterPage(page);
 
       const params: ClusterListArgs = {
-        page: 1,
-        page_size: 1000
+        page: page,
+        page_size: PAGE_SIZE
       };
+      if (searchClusterName !== '') {
+        params.name = searchClusterName;
+      }
 
       const queryString = new URLSearchParams(
         Object.entries(params)
@@ -166,6 +172,7 @@ export function WorkspaceForm() {
           )
           .map(([key, value]) => [key, value.toString()])
       ).toString();
+
       try {
         const response = await fetch(
           `/api/server/cluster/list?${queryString}`,
@@ -178,22 +185,37 @@ export function WorkspaceForm() {
 
         if (response.ok) {
           const data: ClusterList = await response.json();
-          setClusters(data.clusters || []);
+          if (page === 1) {
+            const newClusters = data.clusters || [];
+            setHasMoreClusters(newClusters.length < data.total);
+            setClusters(newClusters);
+            console.log(newClusters.length);
+            return;
+          }
+          setClusters((prevClusters) => {
+            const uniqueClusters = new Map();
+            prevClusters.forEach((cluster) => {
+              uniqueClusters.set(cluster.id, cluster);
+            });
+            (data.clusters || []).forEach((cluster) => {
+              uniqueClusters.set(cluster.id, cluster);
+            });
+            const newClusters = Array.from(uniqueClusters.values());
+            setHasMoreClusters(newClusters.length < data.total);
+            return newClusters;
+          });
         } else {
-          setClusters([]);
-          toast.error('Failed to load clusters');
+          toast.error('Failed to load more clusters');
         }
       } catch (error) {
-        console.error('Failed to fetch clusters:', error);
-        setClusters([]);
-        toast.error('Failed to load clusters');
+        console.error('Failed to fetch more clusters:', error);
+        toast.error('Failed to load more clusters');
       } finally {
         setLoadingClusters(false);
       }
-    };
-
-    fetchClusters();
-  }, [user?.token]);
+    },
+    [user?.token, PAGE_SIZE]
+  );
 
   // Load workspace data for editing
   useEffect(() => {
@@ -660,25 +682,22 @@ export function WorkspaceForm() {
               Select clusters to associate with this workspace
             </p>
 
-            {loadingClusters ? (
-              <div>Loading clusters...</div>
-            ) : clusters.length === 0 ? (
-              <div className='text-muted-foreground text-sm'>
-                No clusters available. Please create a cluster first.
-              </div>
-            ) : (
+            {
               <FormField
                 control={form.control}
                 name='cluster_ids'
                 render={() => (
                   <FormItem>
                     <div className='space-y-2'>
-                      <Popover open={open} onOpenChange={setOpen}>
+                      <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant='outline'
                             role='combobox'
                             className='min-h-10 w-full justify-between'
+                            onClick={() => {
+                              loadClusters('', 1);
+                            }}
                           >
                             <div className='flex flex-1 flex-wrap gap-1'>
                               {form.getValues('cluster_ids').length === 0 ? (
@@ -738,17 +757,25 @@ export function WorkspaceForm() {
                           }}
                         >
                           <Command>
-                            <CommandInput placeholder='Search clusters...' />
+                            <CommandInput
+                              placeholder='Search clusters...'
+                              onValueChange={(e) => loadClusters(e, 1)}
+                            />
                             <CommandList>
-                              <CommandEmpty>No cluster found.</CommandEmpty>
+                              {loadingClusters ? (
+                                <div className='flex items-center justify-center p-4'>
+                                  <div className='text-muted-foreground text-sm'>
+                                    Loading...
+                                  </div>
+                                </div>
+                              ) : (
+                                <CommandEmpty>No cluster found.</CommandEmpty>
+                              )}
                               <CommandGroup>
                                 {clusters.map((cluster) => {
-                                  const clusterIds =
-                                    form.getValues('cluster_ids');
-                                  const isSelected = clusterIds.includes(
-                                    cluster.id
-                                  );
-
+                                  const isSelected = form
+                                    .getValues('cluster_ids')
+                                    .includes(Number(cluster.id));
                                   return (
                                     <CommandItem
                                       key={cluster.id}
@@ -761,19 +788,38 @@ export function WorkspaceForm() {
                                         );
                                       }}
                                     >
-                                      <Check
-                                        className={cn(
-                                          'mr-2 h-4 w-4',
-                                          isSelected
-                                            ? 'opacity-100'
-                                            : 'opacity-0'
+                                      <div className='mr-2 h-4 w-4'>
+                                        {isSelected && (
+                                          <Check className='text-primary' />
                                         )}
-                                      />
-                                      {cluster.name} ({cluster.id})
+                                      </div>
+                                      {cluster.name}
                                     </CommandItem>
                                   );
                                 })}
                               </CommandGroup>
+                              {hasMoreClusters && (
+                                <div className='p-2 text-center'>
+                                  <Button
+                                    variant='outline'
+                                    size='sm'
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      loadClusters(
+                                        searchClusterName,
+                                        clusterPage + 1
+                                      );
+                                    }}
+                                    disabled={loadingClusters}
+                                    className='w-full'
+                                  >
+                                    {loadingClusters
+                                      ? 'Loading...'
+                                      : 'Load More Clusters'}
+                                  </Button>
+                                </div>
+                              )}
                             </CommandList>
                           </Command>
                         </PopoverContent>
@@ -783,29 +829,31 @@ export function WorkspaceForm() {
                   </FormItem>
                 )}
               />
-            )}
+            }
 
-            <FormField
-              control={form.control}
-              name='description'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder='Workspace description...'
-                      className='resize-none'
-                      rows={3}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Brief description of the workspace purpose
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {
+              <FormField
+                control={form.control}
+                name='description'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder='Workspace description...'
+                        className='resize-none'
+                        rows={3}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Brief description of the workspace purpose
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            }
           </div>
 
           <div className='flex gap-4'>
