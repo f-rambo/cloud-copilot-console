@@ -173,6 +173,7 @@ export interface Cluster {
   api_server_address: string;
   status:
     | 'unspecified'
+    | 'creating'
     | 'starting'
     | 'running'
     | 'stopping'
@@ -181,6 +182,8 @@ export interface Cluster {
     | 'error';
   level: 'basic' | 'standard' | 'advanced' | 'unspecified';
   domain: string;
+  public_key: string;
+  private_key: string;
   node_number: number;
   provider: string;
   region: string;

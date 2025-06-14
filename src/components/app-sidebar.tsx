@@ -8,7 +8,8 @@ import {
   LayoutDashboard,
   Users,
   Cloudy,
-  Blinds
+  Building2,
+  Clapperboard
 } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -49,12 +50,8 @@ const data = {
     {
       title: 'Workspace',
       url: '/home/workspace',
-      icon: Users,
+      icon: Building2,
       items: [
-        {
-          title: 'Users',
-          url: '#'
-        },
         {
           title: 'Roles',
           url: '#'
@@ -69,7 +66,7 @@ const data = {
     {
       title: 'Project',
       url: '/home/project',
-      icon: Blinds,
+      icon: Clapperboard,
       items: [
         {
           title: 'Apps',
@@ -80,6 +77,11 @@ const data = {
           url: '/home/project/service'
         }
       ]
+    },
+    {
+      title: 'User',
+      url: '/home/user',
+      icon: Users
     }
   ]
 };

@@ -17,19 +17,9 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Workspace,
-  ResourceQuota,
-  WorkspaceClusterRelationship
-} from '@/lib/types/workspace';
+import { Workspace, WorkspaceClusterRelationship } from '@/lib/types/workspace';
+import { ResourceQuota } from '@/lib/types/common';
 import { ClusterListArgs, Cluster, ClusterList } from '@/lib/types/cluster';
 import { useAuth } from '@/contexts/auth-context';
 import { Check, ChevronDown, X } from 'lucide-react';
@@ -57,7 +47,8 @@ const resourceLimitSchema = z.object({
   request: z
     .number()
     .min(0, { message: 'Request must be a non-negative number' }),
-  limit: z.number().min(0, { message: 'Limit must be a non-negative number' })
+  limit: z.number().min(0, { message: 'Limit must be a non-negative number' }),
+  used: z.number().min(0, { message: 'Used must be a non-negative number' })
 });
 
 // Resource quota validation schema
@@ -66,7 +57,10 @@ const resourceQuotaSchema = z.object({
   memory: resourceLimitSchema,
   gpu: resourceLimitSchema,
   storage: resourceLimitSchema,
-  pods: resourceLimitSchema
+  pods: resourceLimitSchema,
+  replicas: z
+    .number()
+    .min(0, { message: 'Replicas must be a non-negative number' })
 });
 
 // Workspace form schema
@@ -94,11 +88,7 @@ const workspaceFormSchema = z.object({
   resource_quota: resourceQuotaSchema,
   cluster_ids: z
     .array(z.number())
-    .min(1, { message: 'At least one cluster must be selected' }),
-  cluster_permissions: z.record(
-    z.string(),
-    z.enum(['read', 'write', 'admin', 'unknown'])
-  )
+    .min(1, { message: 'At least one cluster must be selected' })
 });
 
 type WorkspaceFormValues = z.infer<typeof workspaceFormSchema>;
@@ -118,11 +108,12 @@ export function WorkspaceForm() {
 
   // Default resource quota values
   const defaultResourceQuota: ResourceQuota = {
-    cpu: { request: 1, limit: 2 },
-    memory: { request: 1024, limit: 2048 },
-    gpu: { request: 0, limit: 0 },
-    storage: { request: 10, limit: 20 },
-    pods: { request: 5, limit: 10 }
+    cpu: { request: 1, limit: 2, used: 0 },
+    memory: { request: 1024, limit: 2048, used: 0 },
+    gpu: { request: 0, limit: 0, used: 0 },
+    storage: { request: 10, limit: 20, used: 0 },
+    pods: { request: 5, limit: 10, used: 0 },
+    replicas: 0
   };
 
   const form = useForm<WorkspaceFormValues>({
@@ -133,13 +124,10 @@ export function WorkspaceForm() {
       git_repository: '',
       image_repository: '',
       resource_quota: defaultResourceQuota,
-      cluster_ids: [],
-      cluster_permissions: {}
+      cluster_ids: []
     },
     mode: 'onChange'
   });
-
-  const watchedClusterPermissions = form.watch('cluster_permissions');
 
   useEffect(() => {
     const errors = form.formState.errors;
@@ -231,11 +219,6 @@ export function WorkspaceForm() {
             const clusterIds = workspace.cluster_relationships.map((rel) =>
               Number(rel.cluster_id)
             );
-            const clusterPermissions: Record<string, string> = {};
-
-            workspace.cluster_relationships.forEach((rel) => {
-              clusterPermissions[rel.cluster_id.toString()] = rel.permissions;
-            });
 
             form.reset({
               id: Number(workspace.id),
@@ -244,11 +227,7 @@ export function WorkspaceForm() {
               git_repository: workspace.git_repository,
               image_repository: workspace.image_repository,
               resource_quota: workspace.resource_quota,
-              cluster_ids: clusterIds,
-              cluster_permissions: clusterPermissions as Record<
-                string,
-                'unknown' | 'read' | 'write' | 'admin'
-              >
+              cluster_ids: clusterIds
             });
           }
         } catch (error) {
@@ -273,8 +252,7 @@ export function WorkspaceForm() {
         data.cluster_ids.map((clusterId) => ({
           id: 0, // Will be assigned by the server
           workspace_id: isEditing ? Number(workspaceId) : 0, // Will be assigned by the server for new workspaces
-          cluster_id: clusterId,
-          permissions: data.cluster_permissions[clusterId.toString()] || 'read'
+          cluster_id: clusterId
         }));
 
       const payload: Partial<Workspace> = {
@@ -316,27 +294,16 @@ export function WorkspaceForm() {
   };
 
   // Helper function to handle cluster selection
+  // Helper function to handle cluster selection
   const handleClusterSelection = (clusterId: number, checked: boolean) => {
     const currentIds = form.getValues('cluster_ids');
-
     if (checked && !currentIds.includes(clusterId)) {
-      // 确保clusterId是数字类型
       form.setValue('cluster_ids', [...currentIds, Number(clusterId)]);
-      // Set default permission to 'read' for newly selected clusters
-      const permissions = form.getValues('cluster_permissions');
-      form.setValue('cluster_permissions', {
-        ...permissions,
-        [clusterId.toString()]: 'read'
-      });
     } else if (!checked) {
       form.setValue(
         'cluster_ids',
         currentIds.filter((id) => Number(id) !== Number(clusterId))
       );
-      // Remove permission for deselected cluster
-      const permissions = { ...form.getValues('cluster_permissions') };
-      delete permissions[clusterId.toString()];
-      form.setValue('cluster_permissions', permissions);
     }
   };
 
@@ -813,59 +780,6 @@ export function WorkspaceForm() {
                       </Popover>
                     </div>
                     <FormMessage />
-
-                    {/* 显示已选集群的权限设置 */}
-                    <div className='mt-4 space-y-4'>
-                      {form.getValues('cluster_ids').length > 0 && (
-                        <div className='text-sm font-medium'>
-                          Cluster Permissions
-                        </div>
-                      )}
-                      {form.getValues('cluster_ids').map((clusterId) => {
-                        const cluster = clusters.find(
-                          (c) => Number(c.id) === Number(clusterId)
-                        );
-                        const permissionValue =
-                          watchedClusterPermissions[clusterId.toString()] ||
-                          'read';
-
-                        return (
-                          <div
-                            key={clusterId}
-                            className='flex items-center justify-between rounded-md border p-3'
-                          >
-                            <span className='text-sm font-medium'>
-                              {cluster?.name}
-                            </span>
-                            <Select
-                              value={permissionValue}
-                              onValueChange={(value) => {
-                                const permissions = form.getValues(
-                                  'cluster_permissions'
-                                );
-                                form.setValue('cluster_permissions', {
-                                  ...permissions,
-                                  [clusterId.toString()]: value as
-                                    | 'read'
-                                    | 'write'
-                                    | 'admin'
-                                    | 'unknown'
-                                });
-                              }}
-                            >
-                              <SelectTrigger className='w-[120px]'>
-                                <SelectValue placeholder='Permission' />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value='read'>Read</SelectItem>
-                                <SelectItem value='write'>Write</SelectItem>
-                                <SelectItem value='admin'>Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        );
-                      })}
-                    </div>
                   </FormItem>
                 )}
               />

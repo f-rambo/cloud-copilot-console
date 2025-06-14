@@ -172,8 +172,11 @@ export function ClusterForm() {
   useEffect(() => {
     if (isEditing && clusterId) {
       const fetchCluster = async () => {
+        if (!user) {
+          return;
+        }
         try {
-          const response = await fetch(`/api/server/cluster/${clusterId}`, {
+          const response = await fetch(`/api/server/cluster?id=${clusterId}`, {
             headers: {
               Authorization: `Bearer ${user?.token}`
             }
@@ -203,7 +206,7 @@ export function ClusterForm() {
 
       fetchCluster();
     }
-  }, [isEditing, clusterId, user?.token, form]);
+  }, [isEditing, clusterId, user, form]);
 
   // Load regions when access credentials change
   useEffect(() => {

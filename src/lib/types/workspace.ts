@@ -1,3 +1,5 @@
+import { ResourceQuota } from '@/lib/types/common';
+
 // WorkspaceDetailParam interface
 export interface WorkspaceDetailParam {
   id: number;
@@ -10,27 +12,11 @@ export interface WorkspaceListParam {
   size: number;
 }
 
-// ResourceLimit interface
-export interface ResourceLimit {
-  request: number;
-  limit: number;
-}
-
-// ResourceQuota interface
-export interface ResourceQuota {
-  cpu: ResourceLimit;
-  memory: ResourceLimit;
-  gpu: ResourceLimit;
-  storage: ResourceLimit;
-  pods: ResourceLimit;
-}
-
 // WorkspaceClusterRelationship interface
 export interface WorkspaceClusterRelationship {
   id: number;
   workspace_id: number;
   cluster_id: number;
-  permissions: 'read' | 'write' | 'admin' | 'unknown';
 }
 
 // Workspace interface

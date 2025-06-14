@@ -60,6 +60,16 @@ import { ClusterListArgs, ClusterList, Cluster } from '@/lib/types/cluster';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 
 export function ClusterTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -81,6 +91,7 @@ export function ClusterTable() {
   const [nameFilter, setNameFilter] = React.useState('');
   const router = useRouter();
   const { user } = useAuth();
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
 
   // 获取集群列表的函数
   const fetchClusters = React.useCallback(async () => {
@@ -256,37 +267,107 @@ export function ClusterTable() {
       cell: ({ row }) => {
         const cluster = row.original;
 
+        const DeleteConfirm = () => {
+          return (
+            <AlertDialog
+              open={showDeleteDialog}
+              onOpenChange={setShowDeleteDialog}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Are you sure you want to delete this cluster?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action will permanently delete cluster {cluster.name}{' '}
+                    and cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      if (!user?.token) {
+                        return;
+                      }
+                      try {
+                        const response = await fetch(
+                          `/api/server/cluster?id=${cluster.id}`,
+                          {
+                            method: 'DELETE',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              Authorization: `Bearer ${user?.token}`
+                            }
+                          }
+                        );
+
+                        if (!response.ok) {
+                          throw new Error('Delete cluster failed');
+                        }
+
+                        toast.success(
+                          `Cluster ${cluster.name} deleted successfully`
+                        );
+                        fetchClusters();
+                      } catch (error) {
+                        console.error(error);
+                        toast.error('Delete cluster failed');
+                      }
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          );
+        };
+
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant='ghost' className='h-8 w-8 p-0'>
-                <span className='sr-only'>Menu</span>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end'>
-              <DropdownMenuLabel>Action</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() =>
-                  navigator.clipboard.writeText(cluster.id.toString())
-                }
-              >
-                Copy ID
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  router.push(`cluster/detail?clusterid=${cluster.id}`);
-                }}
-              >
-                Detail
-              </DropdownMenuItem>
-              <DropdownMenuItem>Edit</DropdownMenuItem>
-              <DropdownMenuItem className='text-red-600'>
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant='ghost' className='h-8 w-8 p-0'>
+                  <span className='sr-only'>Menu</span>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end'>
+                <DropdownMenuLabel>Action</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() =>
+                    navigator.clipboard.writeText(cluster.id.toString())
+                  }
+                >
+                  Copy ID
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    router.push(`cluster/detail?clusterid=${cluster.id}`);
+                  }}
+                >
+                  Detail
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    router.push(`cluster/create?clusterid=${cluster.id}`);
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className='text-red-600'
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DeleteConfirm />
+          </>
         );
       }
     }
