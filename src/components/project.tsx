@@ -12,12 +12,7 @@ import {
   getSortedRowModel,
   useReactTable
 } from '@tanstack/react-table';
-import {
-  ArrowUpDown,
-  MoreHorizontal,
-  CheckCircle2Icon,
-  LoaderIcon
-} from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -61,18 +56,22 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
-import {
-  WorkspaceListParam,
-  WorkspaceList,
-  Workspace
-} from '@/lib/types/workspace';
+import { ProjectsRequest, Projects, Project } from '@/lib/types/project';
 import { ResourceQuota } from '@/lib/types/common';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth-context';
-import { Badge } from '@/components/ui/badge';
-import { ClusterIdsArgs, Cluster, ClusterList } from '@/lib/types/cluster';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 
-export function WorkspaceTable() {
+export function ProjectTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -81,8 +80,8 @@ export function WorkspaceTable() {
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   const [loading, setLoading] = React.useState(false);
-  const [workspaceData, setWorkspaceData] = React.useState<WorkspaceList>({
-    items: [],
+  const [projectData, setProjectData] = React.useState<Projects>({
+    projects: [],
     total: 0
   });
   const [pagination, setPagination] = React.useState({
@@ -90,79 +89,23 @@ export function WorkspaceTable() {
     pageSize: 10
   });
   const [nameFilter, setNameFilter] = React.useState('');
-  const [clusters, setClusters] = React.useState<Cluster[]>([]);
-  const loadedClusterIdsRef = React.useRef<Set<number>>(new Set());
   const router = useRouter();
   const { user } = useAuth();
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [selectedProject, setSelectedProject] = React.useState<Project | null>(
+    null
+  );
 
-  const fetchClustersByIds = async (ids: number[]) => {
-    if (!user?.token) {
-      return;
-    }
-    if (ids.length === 0) {
-      return;
-    }
-
-    // 过滤出尚未加载的集群 ID
-    const unloadedIds = ids.filter(
-      (id) => !loadedClusterIdsRef.current.has(id)
-    );
-    if (unloadedIds.length === 0) {
-      return; // 所有集群 ID 都已加载，无需再次调用接口
-    }
-
-    try {
-      const params: ClusterIdsArgs = {
-        ids: unloadedIds
-      };
-      const queryString = new URLSearchParams(
-        Object.entries(params)
-          .filter(
-            ([key, value]) =>
-              value !== undefined &&
-              value !== '' &&
-              key !== undefined &&
-              key !== ''
-          )
-          .map(([key, value]) => [key, value.toString()])
-      ).toString();
-      const response = await fetch(`/api/server/cluster/ids?${queryString}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user.token}`
-        }
-      });
-      if (!response.ok) {
-        throw new Error('Get workspace list error');
-      }
-      const data: ClusterList = await response.json();
-      // 更新已加载的集群 ID 集合
-      unloadedIds.forEach((id) => loadedClusterIdsRef.current.add(id));
-      // 合并新旧数据，避免覆盖
-      setClusters((prevClusters) => {
-        const newClusterMap = new Map(data.clusters.map((c) => [c.id, c]));
-        const existingClusters = prevClusters.filter(
-          (c) => !newClusterMap.has(c.id)
-        );
-        return [...existingClusters, ...data.clusters];
-      });
-    } catch (error) {
-      console.error(error);
-      toast.error('Get workspace list error');
-    }
-  };
-
-  // 获取工作空间列表的函数
-  const fetchWorkspaces = React.useCallback(async () => {
+  // 获取项目列表的函数
+  const fetchProjects = React.useCallback(async () => {
     if (!user?.token) {
       return;
     }
 
     setLoading(true);
     try {
-      const params: WorkspaceListParam = {
-        workspace_name: nameFilter,
+      const params: ProjectsRequest = {
+        name: nameFilter,
         page: pagination.pageIndex + 1,
         size: pagination.pageSize
       };
@@ -179,25 +122,22 @@ export function WorkspaceTable() {
           .map(([key, value]) => [key, value.toString()])
       ).toString();
 
-      const response = await fetch(
-        `/api/server/workspace/list?${queryString}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${user.token}`
-          }
+      const response = await fetch(`/api/server/project/list?${queryString}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.token}`
         }
-      );
+      });
       if (!response.ok) {
-        throw new Error('Get workspace list error');
+        throw new Error('Get project list error');
       }
 
-      const data: WorkspaceList = await response.json();
-      setWorkspaceData(data);
+      const data: Projects = await response.json();
+      setProjectData(data);
     } catch (error) {
       console.error(error);
-      toast.error('Get workspace list error');
+      toast.error('Get project list error');
     } finally {
       setLoading(false);
     }
@@ -205,8 +145,8 @@ export function WorkspaceTable() {
 
   // 初始加载和依赖变化时重新获取数据
   React.useEffect(() => {
-    fetchWorkspaces();
-  }, [fetchWorkspaces]);
+    fetchProjects();
+  }, [fetchProjects]);
 
   // 处理名称过滤
   const handleNameFilterChange = React.useCallback((value: string) => {
@@ -214,7 +154,7 @@ export function WorkspaceTable() {
     setPagination((prev) => ({ ...prev, pageIndex: 0 })); // 重置到第一页
   }, []);
 
-  const columns: ColumnDef<Workspace>[] = [
+  const columns: ColumnDef<Project>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -259,23 +199,6 @@ export function WorkspaceTable() {
       },
       cell: ({ row }) => (
         <div className='capitalize'>{row.getValue('name')}</div>
-      )
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => (
-        <Badge
-          variant='outline'
-          className='text-muted-foreground flex gap-1 px-1.5 capitalize [&_svg]:size-3'
-        >
-          {row.original.status === 'active' ? (
-            <CheckCircle2Icon className='text-green-500 dark:text-green-400' />
-          ) : (
-            <LoaderIcon />
-          )}
-          {row.getValue('status')}
-        </Badge>
       )
     },
     {
@@ -352,75 +275,6 @@ export function WorkspaceTable() {
       }
     },
     {
-      accessorKey: 'cluster_relationships',
-      header: 'Clusters',
-      cell: ({ row }) => {
-        // fetchClustersByIds()
-
-        const clusterIds: number[] = row.original.cluster_relationships.map(
-          (relationship) => relationship.cluster_id
-        );
-
-        if (clusterIds.length === 0) {
-          return (
-            <Badge variant='outline' className='text-muted-foreground px-1.5'>
-              0 clusters
-            </Badge>
-          );
-        }
-
-        return (
-          <HoverCard
-            onOpenChange={(e) => {
-              if (e && clusterIds.length > 0) {
-                fetchClustersByIds(clusterIds);
-              }
-            }}
-          >
-            <HoverCardTrigger asChild>
-              <Badge
-                variant='outline'
-                className='text-muted-foreground cursor-help px-1.5'
-              >
-                {clusterIds?.length || 0} clusters
-              </Badge>
-            </HoverCardTrigger>
-            <HoverCardContent className='w-80'>
-              <div className='space-y-2 text-xs'>
-                {clusters.map((cluster) => (
-                  <div key={cluster.id} className='flex items-center gap-2'>
-                    <span className='font-medium'>ID: {cluster.id}</span>
-                    <span>Name: {cluster.name}</span>
-                  </div>
-                ))}
-                {clusters.length === 0 && (
-                  <div className='text-muted-foreground'>No clusters found</div>
-                )}
-              </div>
-            </HoverCardContent>
-          </HoverCard>
-        );
-      }
-    },
-    {
-      accessorKey: 'git_repository',
-      header: 'Git Repository',
-      cell: ({ row }) => (
-        <div className='max-w-[200px] truncate font-mono text-sm'>
-          {row.getValue('git_repository') || 'Not configured'}
-        </div>
-      )
-    },
-    {
-      accessorKey: 'image_repository',
-      header: 'Image Repository',
-      cell: ({ row }) => (
-        <div className='max-w-[200px] truncate font-mono text-sm'>
-          {row.getValue('image_repository') || 'Not configured'}
-        </div>
-      )
-    },
-    {
       accessorKey: 'description',
       header: 'Description',
       cell: ({ row }) => {
@@ -455,48 +309,118 @@ export function WorkspaceTable() {
       id: 'actions',
       enableHiding: false,
       cell: ({ row }) => {
-        const workspace = row.original;
+        const project = row.original;
+
+        const DeleteConfirm = () => {
+          return (
+            <AlertDialog
+              open={showDeleteDialog && selectedProject?.id === project.id}
+              onOpenChange={(open) => {
+                setShowDeleteDialog(open);
+                if (!open) setSelectedProject(null);
+              }}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Are you sure you want to delete this project?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action will permanently delete project {project.name}{' '}
+                    and cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      if (!user?.token) {
+                        return;
+                      }
+                      try {
+                        const response = await fetch(
+                          `/api/server/project?id=${project.id}`,
+                          {
+                            method: 'DELETE',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              Authorization: `Bearer ${user?.token}`
+                            }
+                          }
+                        );
+
+                        if (!response.ok) {
+                          throw new Error('Delete project failed');
+                        }
+
+                        toast.success(
+                          `Project ${project.name} deleted successfully`
+                        );
+                        fetchProjects();
+                      } catch (error) {
+                        console.error(error);
+                        toast.error('Delete project failed');
+                      }
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          );
+        };
 
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant='ghost' className='h-8 w-8 p-0'>
-                <span className='sr-only'>Menu</span>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end'>
-              <DropdownMenuLabel>Action</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() =>
-                  navigator.clipboard.writeText(workspace.id.toString())
-                }
-              >
-                Copy ID
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  router.push(`workspace/create?workspaceid=` + workspace.id);
-                }}
-              >
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem className='text-red-600'>
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant='ghost' className='h-8 w-8 p-0'>
+                  <span className='sr-only'>Menu</span>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end'>
+                <DropdownMenuLabel>Action</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() =>
+                    navigator.clipboard.writeText(project.id.toString())
+                  }
+                >
+                  Copy ID
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    router.push(`project/create?projectid=` + project.id);
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className='text-red-600'
+                  onClick={() => {
+                    setSelectedProject(project);
+                    setShowDeleteDialog(true);
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DeleteConfirm />
+          </>
         );
       }
     }
   ];
 
   // 计算总页数
-  const pageCount = Math.ceil(workspaceData.total / pagination.pageSize);
+  const pageCount = Math.ceil(projectData.total / pagination.pageSize);
 
   const table = useReactTable({
-    data: workspaceData.items,
+    data: projectData.projects,
     columns,
     pageCount,
     state: {
@@ -522,7 +446,7 @@ export function WorkspaceTable() {
     <div className='w-full'>
       <div className='flex items-center gap-2 py-4'>
         <Input
-          placeholder='By Workspace name...'
+          placeholder='By Project name...'
           value={nameFilter}
           onChange={(event) => handleNameFilterChange(event.target.value)}
           className='max-w-sm'
@@ -559,10 +483,10 @@ export function WorkspaceTable() {
         <Button
           variant='outline'
           size='sm'
-          onClick={() => router.push('workspace/create')}
+          onClick={() => router.push('project/create')}
         >
           <PlusIcon />
-          <span className='hidden lg:inline'>Add Workspace</span>
+          <span className='hidden lg:inline'>Add Project</span>
         </Button>
       </div>
       <div className='rounded-md border'>
@@ -627,7 +551,7 @@ export function WorkspaceTable() {
       <div className='flex items-center justify-between p-3 px-4'>
         <div className='text-muted-foreground hidden flex-1 text-sm lg:flex'>
           Already selected {table.getFilteredSelectedRowModel().rows.length}{' '}
-          row, {workspaceData.total} rows in total
+          row, {projectData.total} rows in total
         </div>
         <div className='flex w-full items-center gap-8 lg:w-fit'>
           <div className='hidden items-center gap-2 lg:flex'>
@@ -666,51 +590,48 @@ export function WorkspaceTable() {
               onClick={() =>
                 setPagination((prev) => ({ ...prev, pageIndex: 0 }))
               }
-              disabled={pagination.pageIndex === 0 || loading}
+              disabled={pagination.pageIndex === 0}
             >
-              <span className='sr-only'>Jump to first page </span>
+              <span className='sr-only'>Go to first page</span>
               <ChevronsLeftIcon />
             </Button>
             <Button
               variant='outline'
-              className='size-8'
-              size='icon'
+              className='h-8 w-8 p-0'
               onClick={() =>
                 setPagination((prev) => ({
                   ...prev,
                   pageIndex: prev.pageIndex - 1
                 }))
               }
-              disabled={pagination.pageIndex === 0 || loading}
+              disabled={pagination.pageIndex === 0}
             >
-              <span className='sr-only'>Previous page</span>
+              <span className='sr-only'>Go to previous page</span>
               <ChevronLeftIcon />
             </Button>
             <Button
               variant='outline'
-              className='size-8'
-              size='icon'
+              className='h-8 w-8 p-0'
               onClick={() =>
                 setPagination((prev) => ({
                   ...prev,
                   pageIndex: prev.pageIndex + 1
                 }))
               }
-              disabled={pagination.pageIndex >= pageCount - 1 || loading}
+              disabled={pagination.pageIndex >= pageCount - 1}
             >
-              <span className='sr-only'>Next page</span>
+              <span className='sr-only'>Go to next page</span>
               <ChevronRightIcon />
             </Button>
             <Button
               variant='outline'
-              className='hidden size-8 lg:flex'
-              size='icon'
+              className='hidden h-8 w-8 p-0 lg:flex'
               onClick={() =>
                 setPagination((prev) => ({ ...prev, pageIndex: pageCount - 1 }))
               }
-              disabled={pagination.pageIndex >= pageCount - 1 || loading}
+              disabled={pagination.pageIndex >= pageCount - 1}
             >
-              <span className='sr-only'>Jump to the last page</span>
+              <span className='sr-only'>Go to last page</span>
               <ChevronsRightIcon />
             </Button>
           </div>

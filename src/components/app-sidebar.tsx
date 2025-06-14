@@ -7,9 +7,9 @@ import {
   GalleryVerticalEnd,
   LayoutDashboard,
   Users,
-  Cloudy,
   Building2,
-  Clapperboard
+  Clapperboard,
+  Server
 } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -61,7 +61,7 @@ const data = {
     {
       title: 'Cluster',
       url: '/home/cluster',
-      icon: Cloudy
+      icon: Server
     },
     {
       title: 'Project',

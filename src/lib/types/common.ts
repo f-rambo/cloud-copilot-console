@@ -2,12 +2,12 @@
 export interface ResourceLimit {
   request: number;
   limit: number;
-  used: number;
+  used?: number;
 }
 
 // ResourceQuota interface
 export interface ResourceQuota {
-  replicas: number;
+  replicas?: number;
   cpu: ResourceLimit;
   memory: ResourceLimit;
   gpu: ResourceLimit;
