@@ -137,7 +137,7 @@ export interface Port {
   id: number;
   name: string;
   path: string;
-  protocol: string;
+  protocol: 'TCP' | 'UDP';
   container_port: number;
 }
 

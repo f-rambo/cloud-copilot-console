@@ -71,6 +71,16 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { ClusterIdsArgs, Cluster, ClusterList } from '@/lib/types/cluster';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 
 export function WorkspaceTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -94,6 +104,10 @@ export function WorkspaceTable() {
   const loadedClusterIdsRef = React.useRef<Set<number>>(new Set());
   const router = useRouter();
   const { user } = useAuth();
+
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [selectedWorkspace, setSelectedWorkspace] =
+    React.useState<Workspace | null>(null);
 
   const fetchClustersByIds = async (ids: number[]) => {
     if (!user?.token) {
@@ -457,36 +471,107 @@ export function WorkspaceTable() {
       cell: ({ row }) => {
         const workspace = row.original;
 
+        const DeleteConfirm = () => {
+          return (
+            <AlertDialog
+              open={showDeleteDialog && selectedWorkspace?.id === workspace.id}
+              onOpenChange={(open) => {
+                setShowDeleteDialog(open);
+                if (!open) setSelectedWorkspace(null);
+              }}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Are you sure you want to delete this workspace?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action will permanently delete workspace{' '}
+                    {workspace.name} and cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      if (!user?.token) {
+                        return;
+                      }
+                      try {
+                        const response = await fetch(
+                          `/api/server/workspace?id=${workspace.id}`,
+                          {
+                            method: 'DELETE',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              Authorization: `Bearer ${user?.token}`
+                            }
+                          }
+                        );
+
+                        if (!response.ok) {
+                          throw new Error('Delete workspace failed');
+                        }
+
+                        toast.success(
+                          `Workspace ${workspace.name} deleted successfully`
+                        );
+                        fetchWorkspaces();
+                        setShowDeleteDialog(false);
+                        setSelectedWorkspace(null);
+                      } catch (error) {
+                        console.error(error);
+                        toast.error('Delete workspace failed');
+                      }
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          );
+        };
+
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant='ghost' className='h-8 w-8 p-0'>
-                <span className='sr-only'>Menu</span>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end'>
-              <DropdownMenuLabel>Action</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() =>
-                  navigator.clipboard.writeText(workspace.id.toString())
-                }
-              >
-                Copy ID
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  router.push(`workspace/create?workspaceid=` + workspace.id);
-                }}
-              >
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem className='text-red-600'>
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant='ghost' className='h-8 w-8 p-0'>
+                  <span className='sr-only'>Menu</span>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end'>
+                <DropdownMenuLabel>Action</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() =>
+                    navigator.clipboard.writeText(workspace.id.toString())
+                  }
+                >
+                  Copy ID
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    router.push(`workspace/create?workspaceid=` + workspace.id);
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className='text-red-600'
+                  onClick={() => {
+                    setSelectedWorkspace(workspace);
+                    setShowDeleteDialog(true);
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DeleteConfirm />
+          </>
         );
       }
     }

@@ -74,6 +74,16 @@ import { ResourceQuota } from '@/lib/types/common';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 
 export function ServiceTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -95,6 +105,11 @@ export function ServiceTable() {
   const [nameFilter, setNameFilter] = React.useState('');
   const router = useRouter();
   const { user } = useAuth();
+
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [selectedService, setSelectedService] = React.useState<Service | null>(
+    null
+  );
 
   // 获取服务列表的函数
   const fetchServices = React.useCallback(async () => {
@@ -200,6 +215,17 @@ export function ServiceTable() {
       cell: ({ row }) => (
         <div className='font-medium capitalize'>{row.getValue('name')}</div>
       )
+    },
+    {
+      accessorKey: 'replicas',
+      header: 'Replicas',
+      cell: ({ row }) => {
+        const quota = row.original.resource_quota;
+        if (!quota || quota.replicas === 0) {
+          return <span className='text-muted-foreground'>Not set</span>;
+        }
+        return <div className='font-mono text-sm'>{quota.replicas}</div>;
+      }
     },
     {
       accessorKey: 'resource_quota',
@@ -482,46 +508,129 @@ export function ServiceTable() {
       cell: ({ row }) => {
         const service = row.original;
 
+        const DeleteConfirm = () => {
+          return (
+            <AlertDialog
+              open={showDeleteDialog && selectedService?.id === service.id}
+              onOpenChange={(open) => {
+                setShowDeleteDialog(open);
+                if (!open) setSelectedService(null);
+              }}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Are you sure you want to delete this service?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action will permanently delete service {service.name}{' '}
+                    and cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      if (!user?.token) {
+                        return;
+                      }
+                      try {
+                        const response = await fetch(
+                          `/api/server/service?id=${service.id}`,
+                          {
+                            method: 'DELETE',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              Authorization: `Bearer ${user?.token}`
+                            }
+                          }
+                        );
+
+                        if (!response.ok) {
+                          throw new Error('Delete service failed');
+                        }
+
+                        toast.success(
+                          `Service ${service.name} deleted successfully`
+                        );
+                        fetchServices();
+                        setShowDeleteDialog(false);
+                        setSelectedService(null);
+                      } catch (error) {
+                        console.error(error);
+                        toast.error('Delete service failed');
+                      }
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          );
+        };
+
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant='ghost' className='h-8 w-8 p-0'>
-                <span className='sr-only'>Menu</span>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end'>
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() =>
-                  navigator.clipboard.writeText(service.id.toString())
-                }
-              >
-                Copy ID
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  // Navigate to service detail or edit page
-                  router.push(`/home/project/service/${service.id}`);
-                }}
-              >
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  // Navigate to service edit page
-                  router.push(`/home/project/service/edit/${service.id}`);
-                }}
-              >
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className='text-red-600'>
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant='ghost' className='h-8 w-8 p-0'>
+                  <span className='sr-only'>Menu</span>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end'>
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() =>
+                    navigator.clipboard.writeText(service.id.toString())
+                  }
+                >
+                  Copy ID
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    // Navigate to service detail or edit page
+                    router.push(`/home/project/service/${service.id}`);
+                  }}
+                >
+                  View Details
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    router.push(
+                      `/home/project/service/detail?serviceid=${service.id}`
+                    );
+                  }}
+                >
+                  Detail
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    // Navigate to service edit page
+                    router.push(
+                      `/home/project/service/create?serviceid=${service.id}`
+                    );
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className='text-red-600'
+                  onClick={() => {
+                    setSelectedService(service);
+                    setShowDeleteDialog(true);
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DeleteConfirm />
+          </>
         );
       }
     }
