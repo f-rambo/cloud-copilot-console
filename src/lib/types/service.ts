@@ -199,7 +199,8 @@ export interface WorkflowTask {
 
 // ContinuousIntegrationsRequest interface
 export interface ContinuousIntegrationsRequest {
-  service_id: number;
+  service_id?: number;
+  version?: string;
   page: number;
   page_size: number;
 }
@@ -231,7 +232,8 @@ export interface ContinuousIntegration {
 
 // ContinuousDeploymentsRequest interface
 export interface ContinuousDeploymentsRequest {
-  service_id: number;
+  service_id?: number;
+  ci_id?: number;
   page: number;
   page_size: number;
 }

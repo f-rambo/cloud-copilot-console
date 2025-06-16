@@ -1,14 +1,19 @@
+'use client';
+import { useSearchParams } from 'next/navigation';
+import { ContinuousIntegrationTable } from '@/components/continuousIntegration';
+import { ContinuousDeploymentTable } from '@/components/continuousDeployment';
+
 export default function Page() {
+  const searchParams = useSearchParams();
+  const serviceId = searchParams.get('serviceid');
   return (
-    <div className='p-6'>
-      <div> chart is here</div>
-      <div className='flex gap-4'>
-        <div className='w-1/2 rounded-lg border border-gray-300 p-4'>
-          <div>ci table</div>
-        </div>
-        <div className='w-1/2 rounded-lg border border-gray-300 p-4'>
-          <div>cd table</div>
-        </div>
+    <div className='flex flex-col gap-6 p-6'>
+      {/* <div> chart</div> */}
+      <div>
+        <ContinuousIntegrationTable serviceId={Number(serviceId)} />
+      </div>
+      <div>
+        <ContinuousDeploymentTable serviceId={Number(serviceId)} />
       </div>
     </div>
   );

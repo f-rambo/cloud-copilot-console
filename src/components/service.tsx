@@ -212,9 +212,21 @@ export function ServiceTable() {
           </Button>
         );
       },
-      cell: ({ row }) => (
-        <div className='font-medium capitalize'>{row.getValue('name')}</div>
-      )
+      cell: ({ row }) => {
+        const service = row.original;
+        return (
+          <div
+            className='hover: cursor-pointer font-medium capitalize hover:underline'
+            onClick={() => {
+              router.push(
+                `/home/project/service/detail?serviceid=${service.id}`
+              );
+            }}
+          >
+            {row.getValue('name')}
+          </div>
+        );
+      }
     },
     {
       accessorKey: 'replicas',
